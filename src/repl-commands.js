@@ -84,6 +84,7 @@ export async function handleCommand(cmd, arg, ctx) {
 
     case '/doctor': await runDoctor(); break;
     case '/model': console.log(`\n${formatModelInfo()}\n`); break;
+    case '/keys': return 'keys';
     case '/clear': console.clear(); break;
     default: log('info', `Unknown: ${cmd}. /help`);
   }

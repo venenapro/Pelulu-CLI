@@ -9,6 +9,8 @@ import { formatToolResult } from './core/formatter.js';
 import { parseIntent } from './core/intent.js';
 import { FileTracker } from './core/file-tracker.js';
 import { handleCommand } from './repl-commands.js';
+import { getCompletions } from './core/completion.js';
+import { formatKeybindings } from './core/keybindings.js';
 import {
   renderBanner, renderStatus, renderTools, renderHelp,
   renderToolCall, renderToolResult, renderAiResponse,
@@ -16,19 +18,21 @@ import {
 } from './tui/renderer.js';
 
 export class REPL {
-  constructor(registry, mqtt, stats, session) {
+  constructor(registry, mqtt, stats, session, extras = {}) {
     this.registry = registry;
     this.mqtt = mqtt;
     this.stats = stats;
     this.session = session;
     this.fileTracker = new FileTracker();
+    this.thinking = extras.thinking || null;
+    this.sender = extras.sender || null;
+    this.autoFormat = extras.autoFormat || null;
     this.rl = null;
     this.history = [];
   }
 
   start() {
     const config = getConfig();
-    renderBanner(config, this.registry.all(), this.mqtt.connected);
     this._events();
 
     if (!process.stdin.isTTY) {
@@ -41,6 +45,10 @@ export class REPL {
     this.rl = createInterface({
       input: process.stdin, output: process.stdout,
       prompt: createPrompt(dirName), historySize: 200,
+      completer: (line) => {
+        const hits = getCompletions(line);
+        return [hits.length ? hits : [], line];
+      },
     });
     this.rl.prompt();
     this.rl.on('line', (input) => this._line(input.trim()));
@@ -49,12 +57,15 @@ export class REPL {
 
   _events() {
     bus.on('llm:text', (text) => {
+      if (this.thinking) this.thinking.set('idle');
+      // Clear any thinking indicator line
+      process.stdout.write('\r' + ' '.repeat(60) + '\r');
       renderAiResponse(text);
       if (this.rl) this.rl.prompt();
     });
 
     bus.on('tts:sentence', (text) => {
-      console.log(chalk.dim(`     🔊 ${text}`));
+      // TTS is audio output, no need to display text
     });
 
     bus.on('tool:called', ({ name, result, args }) => {
@@ -63,7 +74,7 @@ export class REPL {
     });
 
     bus.on('ready', () => {
-      console.log(chalk.green('  ✅ XiaoZhi session ready\n'));
+      if (this.rl) this.rl.prompt();
     });
   }
 
@@ -75,7 +86,11 @@ export class REPL {
     const intent = parseIntent(input);
     if (intent.matched) {
       renderUserInput(input);
+      if (this.thinking) this.thinking.set('tool_call');
       const result = await this.registry.call(intent.tool, intent.params);
+      if (this.thinking) this.thinking.set('idle');
+      // Clear thinking indicator
+      process.stdout.write('\r' + ' '.repeat(60) + '\r');
       const formatted = formatToolResult(intent.tool, intent.action, result);
       console.log(`\n${formatted}\n`);
       this.history.push({ role: 'user', text: input, ts: Date.now() });
@@ -86,6 +101,7 @@ export class REPL {
     // Send to XiaoZhi
     renderUserInput(input);
     this.history.push({ role: 'user', text: input, ts: Date.now() });
+    if (this.thinking) this.thinking.set('thinking');
     this.mqtt.sendText(input);
     this.rl?.prompt();
   }
@@ -93,11 +109,15 @@ export class REPL {
   async _cmd(input) {
     const [cmd, ...rest] = input.split(' ');
     const arg = rest.join(' ');
-    const ctx = { registry: this.registry, mqtt: this.mqtt, stats: this.stats, session: this.session, fileTracker: this.fileTracker, history: this.history };
+    const ctx = {
+      registry: this.registry, mqtt: this.mqtt, stats: this.stats,
+      session: this.session, fileTracker: this.fileTracker, history: this.history,
+    };
     const special = await handleCommand(cmd, arg, ctx);
 
     if (special === 'help') renderHelp();
     if (special === 'tools') renderTools(this.registry.list());
+    if (special === 'keys') console.log(formatKeybindings());
     if (special === 'status') {
       const s = this.session.getStats();
       renderStatus({

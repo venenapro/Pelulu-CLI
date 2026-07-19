@@ -18,23 +18,19 @@ export class ToolRegistry {
   #tools = new Map();
 
   async loadBuiltins() {
+    const failed = [];
     try {
       const files = await readdir(TOOLS_DIR);
       for (const file of files.filter(f => f.endsWith('.js'))) {
         try {
           const mod = await import(join(TOOLS_DIR, file));
           const tool = mod.default || mod;
-          if (tool?.name && tool?.handler) {
-            this.register(tool);
-            log('tool', `  ${tool.name} — ${tool.description || ''} (${tool.actions?.length || 0} actions)`);
-          }
-        } catch (e) {
-          log('warn', `Tool "${file}" failed: ${e.message}`);
-        }
+          if (tool?.name && tool?.handler) this.register(tool);
+        } catch (e) { failed.push(file); }
       }
-    } catch (e) {
-      log('warn', `Tools dir not found: ${e.message}`);
-    }
+    } catch (e) { /* silent */ }
+    if (failed.length) log('warn', `Failed tools: ${failed.join(', ')}`);
+    return { loaded: this.#tools.size, failed: failed.length };
   }
 
   register(tool) {

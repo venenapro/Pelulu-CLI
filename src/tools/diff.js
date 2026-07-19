@@ -6,6 +6,7 @@ import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 import { homedir } from 'os';
 import { log } from '../core/logger.js';
+import { showDiff } from '../core/diff.js';
 
 const HOME = homedir();
 
@@ -49,6 +50,11 @@ const ACTIONS = {
       }
 
       return { file1: abs1, file2: abs2, totalChanges: changes.length, hunks: hunks.slice(0, 20) };
+    },
+    format: async ({ file1, file2 }) => {
+      const c1 = await readFile(file1, 'utf-8').catch(() => '');
+      const c2 = await readFile(file2, 'utf-8').catch(() => '');
+      if (c1 && c2) showDiff(c1, c2, file1);
     },
   },
 
