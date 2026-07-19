@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Pelulu CLI — Entry Point
- * Usage: cd my-project && pelulu
+ * Ink-based TUI with React components
  */
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -18,50 +18,35 @@ import { buildContext } from './core/context.js';
 import { isDestructive, askConfirmation } from './core/confirm.js';
 import { runWizard } from './core/wizard.js';
 import { handleError } from './core/error-handler.js';
-import { withRetry, isRetryable } from './core/retry.js';
+import { withRetry } from './core/retry.js';
 import { withSpinner } from './core/spinner.js';
 import { Thinking } from './core/thinking.js';
 import { autoFormat } from './core/auto-format.js';
+import { FileTracker } from './core/file-tracker.js';
 import { MqttClient } from './mcp/mqtt-client.js';
 import { MessageSender } from './mcp/message-sender.js';
 import { WssEndpoint } from './mcp/wss-endpoint.js';
 import { PluginManager } from './plugins/manager.js';
-import { REPL } from './repl.js';
 import { checkForUpdates } from './core/update-checker.js';
-import {
-  renderUpdateNotification, renderUpdateError,
-  renderBanner, renderInitLine, renderReady,
-} from './tui/renderer.js';
+import { startInkTUI } from './tui/ink-entry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
 const args = process.argv.slice(2);
 if (args.includes('--debug')) setDebug(true);
-if (args.includes('--wizard')) { /* force wizard */ }
 const LIST_TOOLS = args.includes('--list-tools');
 
 async function main() {
   // 1. Load config
   const config = await loadConfig(ROOT);
 
-  // 2. Check for updates
+  // 2. Check for updates (print before Ink takes over terminal)
   const update = await checkForUpdates(ROOT);
   if (update.available) {
-    renderUpdateNotification(update);
-    const readline = await import('readline');
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const answer = await new Promise(resolve => {
-      rl.question(chalk.yellow('  ⏩ Lanjutkan tanpa update? (y/N): '), resolve);
-    });
-    rl.close();
-    if (answer.trim().toLowerCase() !== 'y') {
-      console.log(chalk.green('\n  ✅ Silakan update terlebih dahulu. Keluar...\n'));
-      process.exit(0);
-    }
-    console.log(chalk.dim('  ⚠️  Melanjutkan tanpa update...\n'));
-  } else if (update.error) {
-    renderUpdateError(update.message);
+    console.log(chalk.yellow(`\n  UPDATE TERSEDIA: v${update.local} -> v${update.remote}`));
+    console.log(chalk.cyan(`  ${update.release?.url || ''}`));
+    console.log(chalk.gray('  npm update -g pelulu-cli\n'));
   }
 
   // 3. Workspace & wizard
@@ -71,22 +56,19 @@ async function main() {
     await runWizard(ROOT);
   }
 
-  // 4. Load tools (with spinner)
+  // 4. Load tools
   const registry = new ToolRegistry();
   const pluginMgr = new PluginManager(registry);
 
-  const { loaded, failed } = await withSpinner('Loading tools...', async () => {
-    const result = await registry.loadBuiltins();
-    await pluginMgr.load();
-    return result;
+  const { loaded } = await withSpinner('Loading tools...', async () => {
+    return await registry.loadBuiltins();
   });
+  await pluginMgr.load();
   const actions = registry.all().reduce((s, t) => s + (t.actions?.length || 0), 0);
-  renderInitLine('🔧', `${loaded} tools loaded`, `${actions} actions${failed ? `, ${failed} failed` : ''}`);
 
-  // --list-tools mode
   if (LIST_TOOLS) {
     const tools = registry.list();
-    console.log('\n🔧 Tools:\n');
+    console.log('\nTools:\n');
     for (const t of tools) console.log(`  ${t.name} — ${t.description} (${t.actions.join(', ')})`);
     console.log(`\n  ${tools.length} tools, ${tools.reduce((s, t) => s + t.actions.length, 0)} actions\n`);
     process.exit(0);
@@ -97,36 +79,34 @@ async function main() {
   const session = new SessionState();
   const stats = new Stats();
   const thinking = new Thinking();
+  const fileTracker = new FileTracker();
 
   // 6. Build context & system prompt
   const context = await buildContext();
   const systemPrompt = buildSystemPrompt(registry, config);
 
-  // 7. Connect to XiaoZhi (with spinner)
+  // 7. Connect to XiaoZhi
   const mqtt = new MqttClient(config);
 
   bus.on('activation:required', ({ code }) => {
+    // Activation must happen before Ink renders
     console.log('');
-    console.log(`  ╔═════════════════════════════════════════════╗`);
-    console.log(`  ║  🔐 Kode Aktivasi: ${String(code).padEnd(25)}║`);
-    console.log(`  ║  🌐 https://xiaozhi.me                     ║`);
-    console.log(`  ╚═════════════════════════════════════════════╝`);
+    console.log(`  Kode Aktivasi: ${code}`);
+    console.log(`  https://xiaozhi.me`);
     console.log('');
   });
 
   try {
-    await withSpinner('Connecting to XiaoZhi...', async () => {
-      await withRetry(() => mqtt.connect(), { maxRetries: 2, delay: 2000 });
-    });
+    await withRetry(() => mqtt.connect(), { maxRetries: 2, delay: 2000 });
   } catch (e) {
-    renderInitLine('❌', `Connection failed: ${e.message}`);
+    console.error(chalk.red(`\n  Connection failed: ${e.message}\n`));
     process.exit(1);
   }
 
-  // 8. Message sender (retry + queue)
+  // 8. Message sender
   const sender = new MessageSender(mqtt);
 
-  // 9. Register MCP tool handler (with error-handler, retry, auto-format, thinking)
+  // 9. Register MCP tool handler
   mqtt.registerToolHandler(
     async (name, args) => {
       const destructive = isDestructive(name, args);
@@ -139,14 +119,10 @@ async function main() {
       thinking.set('tool_call');
       const start = Date.now();
       try {
-        const result = await withRetry(
-          () => registry.call(name, args),
-          { maxRetries: isRetryable ? 1 : 0, delay: 1000 }
-        );
+        const result = await registry.call(name, args);
         stats.record(name, args.action, !result.isError, Date.now() - start);
         session.addToolCall(name, args, result);
 
-        // Auto-format after file writes
         if (name === 'file' && (args.action === 'write' || args.action === 'edit') && args.path) {
           autoFormat(args.path).catch(() => {});
         }
@@ -157,8 +133,7 @@ async function main() {
       } catch (e) {
         stats.record(name, args.action, false, Date.now() - start, e.message);
         thinking.set('idle');
-        const enhanced = handleError(e);
-        throw new Error(enhanced);
+        throw new Error(handleError(e));
       }
     },
     () => registry.toMcpTools()
@@ -178,28 +153,18 @@ async function main() {
   bus.on('user:text', (text) => session.addUserMessage(text));
   bus.on('llm:text', (text) => session.addAiMessage(text));
 
-  // 12. Thinking indicator events
-  bus.on('thinking', ({ state, icon, text }) => {
-    if (state !== 'idle') {
-      process.stdout.write(chalk.dim(`\r  ${icon} ${text}`) + ' '.repeat(20) + '\r');
-    }
-  });
-
-  // 13. Save config & render banner
+  // 12. Save config
   await saveConfig(ROOT, config);
 
-  // Banner with all info merged (replaces separate status bar)
-  renderBanner(config, registry.all(), mqtt.connected, {
-    session: mqtt.sessionId,
+  // 13. Start Ink TUI
+  const { unmount, waitUntilExit } = startInkTUI({
+    registry, mqtt, stats, session, bus, config,
+    extras: { fileTracker, thinking, sender, autoFormat },
   });
-
-  // 14. Start REPL
-  const repl = new REPL(registry, mqtt, stats, session, { thinking, sender, autoFormat });
-  repl.start();
 
   // Graceful shutdown
   const shutdown = async () => {
-    console.log('');
+    unmount();
     console.log(stats.formatReport());
     if (wss) wss.stop();
     await registry.shutdown();
@@ -208,6 +173,9 @@ async function main() {
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+
+  await waitUntilExit();
+  await shutdown();
 }
 
 main().catch(e => {
