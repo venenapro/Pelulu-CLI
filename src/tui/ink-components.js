@@ -8,19 +8,18 @@ import TextInput from 'ink-text-input';
 
 // ─── Status Bar ───────────────────────────────────────────
 export function StatusBar({ connected, session, toolCount, actionCount }) {
-  const w = process.stdout.columns || 80;
   return React.createElement(Box, {
-    borderStyle: 'single', borderColor: 'cyan', width: w, paddingX: 1,
+    borderStyle: 'round', borderColor: 'cyan', width: '100%', paddingX: 1,
   },
-    React.createElement(Text, { bold: true, color: 'cyan' }, ' Pelulu CLI '),
-    React.createElement(Text, { dimColor: true }, '│ '),
-    React.createElement(Text, { color: connected ? 'green' : 'red' },
-      connected ? '● Connected' : '○ Disconnected'
+    React.createElement(Text, { color: 'cyan' }, 'pelulu'),
+    React.createElement(Text, { dimColor: true }, ' '),
+    React.createElement(Text, { color: connected ? 'green' : 'red', dimColor: !connected },
+      connected ? 'on' : 'off'
     ),
-    React.createElement(Text, { dimColor: true }, ' │ '),
-    React.createElement(Text, { dimColor: true }, `Session: ${session || '-'}`),
-    React.createElement(Text, { dimColor: true }, ' │ '),
-    React.createElement(Text, { dimColor: true }, `${toolCount} tools · ${actionCount} actions`),
+    React.createElement(Text, { dimColor: true }, ' '),
+    React.createElement(Text, { dimColor: true }, `${toolCount}t ${actionCount}a`),
+    React.createElement(Text, { dimColor: true }, ' '),
+    React.createElement(Text, { dimColor: true }, session ? `${session.slice(0, 8)}` : '-'),
   );
 }
 
@@ -93,12 +92,12 @@ export function InputBar({ onSubmit, placeholder }) {
   };
 
   return React.createElement(Box, { paddingX: 1 },
-    React.createElement(Text, { color: 'cyan', bold: true }, ' > '),
+    React.createElement(Text, { color: 'cyan' }, '> '),
     React.createElement(TextInput, {
       value,
       onChange: setValue,
       onSubmit: handleSubmit,
-      placeholder: placeholder || 'Type a message...',
+      placeholder: placeholder || 'type a message...',
     }),
   );
 }

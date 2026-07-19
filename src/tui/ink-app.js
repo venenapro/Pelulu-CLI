@@ -172,7 +172,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         messages.length === 0
           ? React.createElement(Box, { paddingLeft: 2, paddingTop: 1 },
               React.createElement(Text, { dimColor: true },
-                'Type a message to get started. Tab for autocomplete. /help for commands.'
+                'type a message to get started. tab for autocomplete. /help for commands.'
               ),
             )
           : messages.map((msg) =>
@@ -188,7 +188,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
       },
         React.createElement(InputBar, {
           onSubmit: handleSubmit,
-          placeholder: 'Type a message or /help ...',
+          placeholder: 'type a message or /help ...',
         }),
       ),
     );

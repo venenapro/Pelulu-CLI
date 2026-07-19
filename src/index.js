@@ -165,7 +165,6 @@ async function main() {
   // Graceful shutdown
   const shutdown = async () => {
     unmount();
-    console.log(stats.formatReport());
     if (wss) wss.stop();
     await registry.shutdown();
     mqtt.disconnect();
