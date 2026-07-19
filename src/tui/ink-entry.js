@@ -7,18 +7,19 @@ import { render } from 'ink';
 import { createApp } from './ink-app.js';
 
 export function startInkTUI({ registry, mqtt, stats, session, bus, config, extras }) {
-  const App = createApp({ registry, mqtt, stats, session, bus, config, extras });
+  const isTTY = process.stdin.isTTY;
 
-  try {
-    const { unmount, waitUntilExit } = render(
-      React.createElement(App),
-      { exitOnCtrlC: false },
-    );
-    return { unmount, waitUntilExit };
-  } catch (e) {
-    // Fallback: if Ink fails (non-TTY, etc.), use readline REPL
+  if (!isTTY) {
     return startFallbackREPL({ registry, mqtt, stats, session, bus, config, extras });
   }
+
+  const App = createApp({ registry, mqtt, stats, session, bus, config, extras });
+
+  const { unmount, waitUntilExit } = render(
+    React.createElement(App),
+    { exitOnCtrlC: false },
+  );
+  return { unmount, waitUntilExit };
 }
 
 async function startFallbackREPL({ registry, mqtt, stats, session, bus, extras }) {

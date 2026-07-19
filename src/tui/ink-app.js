@@ -5,17 +5,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import {
-  StatusBar, MessageBubble, InputBar, ThinkingIndicator, Divider,
+  StatusBar, MessageBubble, ThinkingIndicator,
 } from './ink-components.js';
+import { CompletableInput } from './completable-input.js';
 
 export function createApp({ registry, mqtt, stats, session, bus, config, extras }) {
   return function App() {
     const { exit } = useApp();
+    const { isRawModeSupported } = useStdin();
     const [messages, setMessages] = useState([]);
     const [thinking, setThinking] = useState('idle');
     const [connected, setConnected] = useState(mqtt.connected);
     const [sessionId, setSessionId] = useState(mqtt.sessionId);
-    const scrollRef = useRef(null);
     const maxMessages = 200;
 
     // ─── Bus Events ───────────────────────────────────
@@ -66,11 +67,9 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
       };
     }, []);
 
-    // ─── Keyboard shortcuts ───────────────────────────
+    // ─── Keyboard shortcuts ─────────────────────────
     useInput((input, key) => {
-      if (key.ctrl && input === 'c') {
-        exit();
-      }
+      if (key.ctrl && input === 'c') exit();
     });
 
     // ─── Handle Submit ────────────────────────────────
@@ -98,15 +97,15 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
           const s = session.getStats();
           setMessages(prev => [...prev, {
             id: `sys-${Date.now()}`, role: 'system',
-            content: `MQTT: ${mqtt.connected ? 'Connected' : 'Disconnected'} | Session: ${mqtt.sessionId || '-'} | Tools: ${registry.all().length} | Turns: ${s.turns} | Calls: ${s.toolCalls}`,
+            content: `mqtt: ${mqtt.connected ? 'on' : 'off'} | session: ${mqtt.sessionId || '-'} | tools: ${registry.all().length} | turns: ${s.turns} | calls: ${s.toolCalls}`,
           }]);
           return;
         }
         if (cmd === '/tools') {
           const tools = registry.list();
-          const lines = tools.map(t => `  ${t.name} (${t.actions?.length || 0} actions)`).join('\n');
+          const lines = tools.map(t => `  ${t.name} (${t.actions?.length || 0})`).join('\n');
           setMessages(prev => [...prev, {
-            id: `sys-${Date.now()}`, role: 'system', content: `Tools:\n${lines}`,
+            id: `sys-${Date.now()}`, role: 'system', content: `tools:\n${lines}`,
           }]);
           return;
         }
@@ -156,7 +155,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     const actions = tools.reduce((s, t) => s + (t.actions?.length || 0), 0);
 
     return React.createElement(Box, {
-      flexDirection: 'column', width: '100%', height: '100%',
+      flexDirection: 'column', width: '100%',
     },
       // Top: Status bar
       React.createElement(StatusBar, {
@@ -164,13 +163,12 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         toolCount: tools.length, actionCount: actions,
       }),
 
-      // Middle: Messages (scrollable area)
+      // Middle: Messages
       React.createElement(Box, {
-        flexDirection: 'column', flexGrow: 1,
-        overflowY: 'hidden', paddingY: 0,
+        flexDirection: 'column', paddingY: 1,
       },
         messages.length === 0
-          ? React.createElement(Box, { paddingLeft: 2, paddingTop: 1 },
+          ? React.createElement(Box, { paddingLeft: 2 },
               React.createElement(Text, { dimColor: true },
                 'type a message to get started. tab for autocomplete. /help for commands.'
               ),
@@ -183,10 +181,9 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
 
       // Bottom: Input
       React.createElement(Box, {
-        borderStyle: 'single', borderColor: 'cyan',
-        paddingX: 0, paddingY: 0,
+        borderStyle: 'single', borderColor: 'cyan', paddingX: 0,
       },
-        React.createElement(InputBar, {
+        React.createElement(CompletableInput, {
           onSubmit: handleSubmit,
           placeholder: 'type a message or /help ...',
         }),

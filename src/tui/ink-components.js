@@ -3,27 +3,26 @@
  * Uses React.createElement (no JSX — ESM compatible, no build step)
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdin } from 'ink';
 import TextInput from 'ink-text-input';
 
 // ─── Status Bar ───────────────────────────────────────────
 export function StatusBar({ connected, session, toolCount, actionCount }) {
   return React.createElement(Box, {
-    borderStyle: 'round', borderColor: 'cyan', width: '100%', paddingX: 1,
+    borderStyle: 'single', borderColor: 'cyan', width: '100%', paddingX: 0,
   },
-    React.createElement(Text, { color: 'cyan' }, 'pelulu'),
-    React.createElement(Text, { dimColor: true }, ' '),
+    React.createElement(Text, { color: 'cyan', bold: true }, ' pelulu '),
+    React.createElement(Text, { dimColor: true }, '│ '),
     React.createElement(Text, { color: connected ? 'green' : 'red', dimColor: !connected },
       connected ? 'on' : 'off'
     ),
-    React.createElement(Text, { dimColor: true }, ' '),
-    React.createElement(Text, { dimColor: true }, `${toolCount}t ${actionCount}a`),
-    React.createElement(Text, { dimColor: true }, ' '),
-    React.createElement(Text, { dimColor: true }, session ? `${session.slice(0, 8)}` : '-'),
+    React.createElement(Text, { dimColor: true }, ` ${toolCount}t ${actionCount}a `),
+    React.createElement(Text, { dimColor: true }, '│ '),
+    React.createElement(Text, { dimColor: true }, session ? session.slice(0, 8) : '-'),
   );
 }
 
-// ─── Message Bubble ───────────────────────────────────────
+// ─── Strip Emojis ─────────────────────────────────────────
 function stripEmojis(text) {
   return text
     .replace(/\p{Emoji_Presentation}/gu, '')
@@ -37,6 +36,27 @@ function stripEmojis(text) {
     .trim();
 }
 
+// ─── Wrap text helper ─────────────────────────────────────
+function wrapText(text, maxWidth) {
+  const lines = [];
+  for (const paragraph of text.split('\n')) {
+    if (!paragraph.trim()) { lines.push(''); continue; }
+    const words = paragraph.split(/\s+/);
+    let line = '';
+    for (const word of words) {
+      if (line.length + word.length + 1 > maxWidth && line.length > 0) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = line ? `${line} ${word}` : word;
+      }
+    }
+    if (line) lines.push(line);
+  }
+  return lines;
+}
+
+// ─── Message Bubble ───────────────────────────────────────
 export function MessageBubble({ message }) {
   const { role, content } = message;
   const isUser = role === 'user';
@@ -46,27 +66,34 @@ export function MessageBubble({ message }) {
   if (isTool) {
     return React.createElement(Box, { paddingLeft: 2 },
       React.createElement(Text, { dimColor: true },
-        `  ${message.toolName || 'tool'}${message.action ? '.' + message.action : ''}  ${message.detail || ''}`
+        `${message.toolName || 'tool'}${message.action ? '.' + message.action : ''}  ${message.detail || ''}`
       ),
     );
   }
 
   if (isSystem) {
     return React.createElement(Box, { paddingLeft: 2 },
-      React.createElement(Text, { dimColor: true, italic: true }, `  ${content}`),
+      React.createElement(Text, { dimColor: true, italic: true }, content),
     );
   }
 
   const cleanContent = isUser ? content : stripEmojis(content);
   if (!cleanContent) return null;
 
-  const icon = isUser ? '>' : '*';
   const color = isUser ? 'blue' : 'white';
-  const prefix = isUser ? '  > ' : '    ';
+  const w = (process.stdout.columns || 80) - 6;
 
-  return React.createElement(Box, { paddingLeft: 0, flexDirection: 'column' },
-    React.createElement(Text, { color, bold: isUser },
-      `${prefix}${cleanContent}`
+  if (isUser) {
+    return React.createElement(Box, { paddingLeft: 1, flexDirection: 'column' },
+      React.createElement(Text, { color, bold: true }, `> ${cleanContent}`),
+    );
+  }
+
+  // Assistant: wrap + indent all lines
+  const lines = wrapText(cleanContent, w);
+  return React.createElement(Box, { paddingLeft: 2, flexDirection: 'column' },
+    ...lines.map((line, i) =>
+      React.createElement(Text, { key: i, color }, line)
     ),
   );
 }
@@ -75,7 +102,7 @@ export function MessageBubble({ message }) {
 export function ToolResultLine({ success, detail }) {
   return React.createElement(Box, { paddingLeft: 4 },
     React.createElement(Text, { color: success ? 'green' : 'red' },
-      success ? `  v ${detail || 'OK'}` : `  x ${detail || 'error'}`
+      success ? `v ${detail || 'OK'}` : `x ${detail || 'error'}`
     ),
   );
 }
@@ -107,22 +134,24 @@ export function ThinkingIndicator({ state }) {
   if (!state || state === 'idle') return null;
 
   const labels = {
-    thinking: 'Thinking...',
-    tool_call: 'Using tool...',
-    reading: 'Reading file...',
-    writing: 'Writing...',
-    searching: 'Searching...',
+    thinking: 'thinking...',
+    tool_call: 'using tool...',
+    reading: 'reading file...',
+    writing: 'writing...',
+    searching: 'searching...',
   };
 
   return React.createElement(Box, { paddingLeft: 2 },
     React.createElement(Text, { dimColor: true, italic: true },
-      `  .. ${labels[state] || 'Processing...'}`
+      `.. ${labels[state] || 'processing...'}`
     ),
   );
 }
 
 // ─── Divider ──────────────────────────────────────────────
 export function Divider() {
-  const w = process.stdout.columns || 80;
-  return React.createElement(Text, { dimColor: true }, '─'.repeat(w - 4));
+  return React.createElement(Box, { width: '100%' },
+    React.createElement(Text, { dimColor: true }, '─'.repeat(process.stdout.columns || 80)),
+  );
 }
+
