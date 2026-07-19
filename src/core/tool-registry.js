@@ -1,0 +1,82 @@
+/**
+ * ToolRegistry — central registry for consolidated MCP tools
+ *
+ * Pattern: Each tool has name, description, inputSchema with "action" enum.
+ * Handler receives { action, ...params } and routes to the action handler.
+ *
+ * This keeps us well under XiaoZhi's 32 MCP tool limit.
+ */
+import { readdir } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { log, debug } from './logger.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TOOLS_DIR = join(__dirname, '..', 'tools');
+
+export class ToolRegistry {
+  #tools = new Map();
+
+  async loadBuiltins() {
+    try {
+      const files = await readdir(TOOLS_DIR);
+      for (const file of files.filter(f => f.endsWith('.js'))) {
+        try {
+          const mod = await import(join(TOOLS_DIR, file));
+          const tool = mod.default || mod;
+          if (tool?.name && tool?.handler) {
+            this.register(tool);
+            log('tool', `  ${tool.name} — ${tool.description || ''} (${tool.actions?.length || 0} actions)`);
+          }
+        } catch (e) {
+          log('warn', `Tool "${file}" failed: ${e.message}`);
+        }
+      }
+    } catch (e) {
+      log('warn', `Tools dir not found: ${e.message}`);
+    }
+  }
+
+  register(tool) {
+    if (!tool.name || !tool.handler) throw new Error('Tool needs name + handler');
+    this.#tools.set(tool.name, tool);
+  }
+
+  get(name) { return this.#tools.get(name); }
+
+  all() { return [...this.#tools.values()]; }
+
+  list() {
+    return this.all().map(t => ({
+      name: t.name,
+      description: t.description,
+      actions: t.actions?.map(a => a.name) || [],
+    }));
+  }
+
+  toMcpTools() {
+    return this.all().map(t => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema || { type: 'object', properties: {} },
+    }));
+  }
+
+  async call(name, args = {}) {
+    const tool = this.#tools.get(name);
+    if (!tool) return { isError: true, content: [{ type: 'text', text: `Unknown tool: ${name}` }] };
+    try {
+      const result = await tool.handler(args);
+      return { isError: false, content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result) }] };
+    } catch (e) {
+      return { isError: true, content: [{ type: 'text', text: e.message }] };
+    }
+  }
+
+  async shutdown() {
+    for (const tool of this.#tools.values()) {
+      if (tool.shutdown) await tool.shutdown();
+    }
+    this.#tools.clear();
+  }
+}
