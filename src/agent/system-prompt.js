@@ -1,51 +1,38 @@
 /**
  * SystemPrompt — Enhanced system prompt builder (OpenHands-style)
  * 
- * Builds a comprehensive system prompt with:
- * - Agent identity and capabilities
- * - Available tools with detailed schemas
- * - Workspace context
- * - Microagents/skills (trigger-based)
- * - Plan status
- * - Guidelines and constraints
+ * CONCISE prompt — tools are sent via MCP tools/list, NOT in prompt!
+ * Only include: identity, context, plan, and how to respond.
  */
 
 /**
- * Build the main system prompt
+ * Build the main system prompt (KEEP UNDER 2KB!)
  */
 export function buildSystemPrompt({ registry, config, context, microagents, plan }) {
-  const tools = registry.all();
   const sections = [];
 
-  // 1. Agent Identity
-  sections.push(buildIdentitySection(config));
+  // 1. Agent Identity (short)
+  const name = config.agent?.name || 'Pelulu';
+  sections.push(`You are ${name}, an AI coding agent. Help users with software tasks.`);
 
-  // 2. Capabilities
-  sections.push(buildCapabilitiesSection());
-
-  // 3. Tools
-  sections.push(buildToolsSection(tools));
-
-  // 4. Workspace Context
+  // 2. Workspace Context (if available)
   if (context) {
-    sections.push(`## Workspace Context\n${context}`);
+    sections.push(`## Context\n${context}`);
   }
 
-  // 5. Microagents/Skills
-  if (microagents && microagents.length > 0) {
-    sections.push(buildMicroagentsSection(microagents));
-  }
-
-  // 6. Plan Status
+  // 3. Plan Status
   if (plan) {
-    sections.push(`## Current Plan\n${plan.toPrompt()}`);
+    sections.push(`## Plan\n${plan.toPrompt()}`);
   }
 
-  // 7. Guidelines
-  sections.push(buildGuidelinesSection());
+  // 4. Microagents/Skills (only matched ones)
+  if (microagents && microagents.length > 0) {
+    const short = microagents.map(m => m.content.slice(0, 200)).join('\n');
+    sections.push(`## Skills\n${short}`);
+  }
 
-  // 8. Response Format
-  sections.push(buildResponseFormatSection());
+  // 5. Response format (very short)
+  sections.push('Respond with tool calls in JSON: {"tool":"name","action":"action","param":"value"}. When done: {"tool":"finish","result":"summary"}');
 
   return sections.join('\n\n');
 }

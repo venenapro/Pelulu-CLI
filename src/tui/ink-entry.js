@@ -10,7 +10,15 @@ export function startInkTUI({ registry, mqtt, stats, session, bus, config, extra
   const isTTY = process.stdin.isTTY;
 
   if (!isTTY) {
-    return startFallbackREPL({ registry, mqtt, stats, session, bus, config, extras });
+    // Return a wrapper that handles the async REPL
+    let replResult = null;
+    const replPromise = startFallbackREPL({ registry, mqtt, stats, session, bus, config, extras })
+      .then(result => { replResult = result; return result; });
+    
+    return {
+      unmount: () => { if (replResult) replResult.unmount(); },
+      waitUntilExit: () => replPromise,
+    };
   }
 
   const App = createApp({ registry, mqtt, stats, session, bus, config, extras });

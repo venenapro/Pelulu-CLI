@@ -120,24 +120,17 @@ export class LLMClient {
 
   /**
    * Send messages to LLM via MQTT
+   * Tools are sent via MCP tools/list, NOT in prompt!
    */
   async #sendToLLM(requestId, messages, tools) {
-    // Build the prompt from messages
+    // Build the prompt from messages (NO tool descriptions!)
     const prompt = this.#buildPrompt(messages);
 
-    // Build tool descriptions for the prompt
-    const toolDescriptions = tools ? this.#buildToolDescriptions(tools) : '';
-
-    // Combine into a single message for XiaoZhi
-    const fullPrompt = toolDescriptions
-      ? `${prompt}\n\n${toolDescriptions}`
-      : prompt;
-
-    debug('llm', `Sending request ${requestId} (${messages.length} messages)`);
+    debug('llm', `Sending request ${requestId} (${messages.length} messages, ${prompt.length} chars)`);
 
     // Send via MQTT
     try {
-      await this.#mqtt.sendText(fullPrompt, { requestId });
+      await this.#mqtt.sendText(prompt, { requestId });
     } catch (err) {
       const pending = this.#pendingRequests.get(requestId);
       if (pending) {
