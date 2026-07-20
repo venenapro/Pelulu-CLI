@@ -101,10 +101,17 @@ async function main() {
   const mqtt = new MqttClient(config);
 
   bus.on('activation:required', ({ code }) => {
-    startupLogs.push('');
-    startupLogs.push(`  Kode Aktivasi: ${code}`);
-    startupLogs.push(`  https://xiaozhi.me`);
-    startupLogs.push('');
+    // Display DIRECTLY to console (not buffered) — user must see this!
+    origLog('');
+    origLog(chalk.red('  ╔══════════════════════════════════════════╗'));
+    origLog(chalk.red('  ║') + chalk.bold.white('         ACTIVATION REQUIRED              ') + chalk.red('║'));
+    origLog(chalk.red('  ╠══════════════════════════════════════════╣'));
+    origLog(chalk.red('  ║') + chalk.yellow(`  Code: ${code}`) + ' '.repeat(33 - code.length) + chalk.red('║'));
+    origLog(chalk.red('  ║') + chalk.cyan('  https://xiaozhi.me') + ' '.repeat(23) + chalk.red('║'));
+    origLog(chalk.red('  ╚══════════════════════════════════════════╝'));
+    origLog('');
+    origLog(chalk.gray('  Waiting for activation... (checking every 5s)'));
+    origLog('');
   });
 
   try {

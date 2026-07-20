@@ -33,9 +33,6 @@ export async function handleActivation(data, otaUrl, deviceId, clientId) {
   const a = data.activation;
   if (!a?.code) return data.mqtt;
 
-  log('warn', `🔐 Activation required`);
-  log('info', `📋 Code: ${a.code}`);
-  log('info', `[WEB] https://xiaozhi.me`);
   bus.emit('activation:required', { code: a.code });
 
   const timeout = a.timeout_ms || 120000;
@@ -43,10 +40,10 @@ export async function handleActivation(data, otaUrl, deviceId, clientId) {
 
   while (Date.now() - start < timeout) {
     await new Promise(r => setTimeout(r, 5000));
-    log('info', '[...] Checking activation...');
+    log('info', 'Checking activation...');
     const poll = await fetchOtaConfig(otaUrl, deviceId, clientId);
     if (!poll.activation?.code && poll.mqtt) {
-      log('ok', '[OK] Activated!');
+      log('ok', 'Activated!');
       return poll.mqtt;
     }
   }
