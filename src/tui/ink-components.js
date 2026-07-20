@@ -30,10 +30,10 @@ export function StatusBar({ connected, session }) {
   const sess = session ? session.slice(0, 8) : '---';
 
   return React.createElement(Box, {
-    width: '100%', paddingX: 1, paddingY: 0,
+    borderStyle: 'single', borderColor: 'cyan', width: '100%',
+    paddingX: 1, paddingY: 0,
     flexDirection: 'row', justifyContent: 'space-between',
   },
-    // Left: name + status
     React.createElement(Box, { flexDirection: 'row' },
       React.createElement(Text, { color: 'cyan', bold: true }, '🐱 PELULU '),
       React.createElement(Text, { color: statusColor }, statusDot),
@@ -41,7 +41,6 @@ export function StatusBar({ connected, session }) {
         connected ? ' online' : ' offline'
       ),
     ),
-    // Right: session + provider
     React.createElement(Box, { flexDirection: 'row' },
       React.createElement(Text, { dimColor: true }, `session:${sess}`),
       React.createElement(Text, { dimColor: true }, '  '),
