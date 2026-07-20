@@ -1,8 +1,36 @@
-config.json
+# Dependencies
 node_modules/
+
+# Git
 .git/
+.gitignore
 .github/
+
+# Config (user-specific)
+config.json
+
+# Logs
+logs/
 *.log
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Internal docs (not needed for npm)
+AGENTS.md
+
+# Dev files
+test.js
+test-*.js
+*.test.js
+
+# OpenClaw workspace
+.openclaw/
+
+# Specs (internal)
+xiaozhi-specs.md
+
+# Snippets & conversations (user data)
 snippets/
 conversations/
