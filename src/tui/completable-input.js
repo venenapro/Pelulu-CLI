@@ -43,12 +43,7 @@ export function CompletableInput({ onSubmit, placeholder }) {
       setCompletions([]);
       setCompletionIndex(0);
     } else if (key.return) {
-      // Enter: submit
-      const trimmed = value.trim();
-      if (trimmed) {
-        onSubmit(trimmed);
-        setValue('');
-      }
+      // Enter: handled by TextInput onSubmit, do nothing here
       setShowCompletions(false);
       setCompletions([]);
     } else {
