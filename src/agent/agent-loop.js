@@ -88,6 +88,12 @@ export class AgentLoop {
         this.#setState(AgentState.THINKING);
         const messages = this.#buildMessages(systemPrompt, context);
 
+        // Wait for MCP tools to be processed on first iteration
+        if (this.#iteration === 1) {
+          debug('agent', 'Waiting for MCP tools to be processed...');
+          await new Promise(r => setTimeout(r, 3000));
+        }
+
         // 2. THINK — call LLM
         let llmResponse;
         try {
@@ -138,7 +144,21 @@ export class AgentLoop {
           };
         }
 
-        // 5. Execute tool calls
+        // 5. If no tool calls and has content, treat as final answer (XiaoZhi returns plain text)
+        if ((!toolCalls || toolCalls.length === 0) && content && content.length > 0) {
+          debug('agent', 'No tool calls, treating response as final answer');
+          this.#setState(AgentState.FINISHED);
+          bus.emit('agent:finish', { result: content, iterations: this.#iteration });
+          return {
+            success: true,
+            result: content,
+            iterations: this.#iteration,
+            tokens: this.#totalTokens,
+            cost: this.#totalCost,
+          };
+        }
+
+        // 6. Execute tool calls
         if (toolCalls && toolCalls.length > 0) {
           this.#setState(AgentState.ACTING);
           const results = await this.#executeTools(toolCalls, { tools, sandbox, confirm });
@@ -200,22 +220,15 @@ export class AgentLoop {
 
   /**
    * Build messages array for LLM
+   * Context is already in systemPrompt, don't duplicate!
    */
   #buildMessages(systemPrompt, context) {
     const messages = [
       { role: 'system', content: systemPrompt },
     ];
 
-    // Add context as system message if available
-    if (context) {
-      messages.push({
-        role: 'system',
-        content: `## Current Context\n${context}`,
-      });
-    }
-
-    // Add plan if exists
-    if (this.#plan) {
+    // Add plan if exists (only if not already in system prompt)
+    if (this.#plan && !systemPrompt.includes('## Plan')) {
       messages.push({
         role: 'system',
         content: `## Current Plan\n${this.#plan.toPrompt()}`,

@@ -144,30 +144,17 @@ export class LLMClient {
 
   /**
    * Build a single prompt from messages array
+   * XiaoZhi only supports user messages - skip system/assistant/tool!
    */
   #buildPrompt(messages) {
-    const parts = [];
-
-    for (const msg of messages) {
-      if (msg.role === 'system') {
-        parts.push(`[System]: ${msg.content}`);
-      } else if (msg.role === 'user') {
-        parts.push(`[User]: ${msg.content}`);
-      } else if (msg.role === 'assistant') {
-        if (msg.content) {
-          parts.push(`[Assistant]: ${msg.content}`);
-        }
-        if (msg.tool_calls) {
-          for (const tc of msg.tool_calls) {
-            parts.push(`[Tool Call]: ${tc.name}(${JSON.stringify(tc.args)})`);
-          }
-        }
-      } else if (msg.role === 'tool') {
-        parts.push(`[Tool Result: ${msg.name}]: ${msg.content}`);
+    // Find the last user message
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        return messages[i].content;
       }
     }
-
-    return parts.join('\n\n');
+    // Fallback: return last message
+    return messages[messages.length - 1]?.content || '';
   }
 
   /**

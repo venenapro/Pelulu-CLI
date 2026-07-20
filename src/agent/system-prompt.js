@@ -11,13 +11,21 @@
 export function buildSystemPrompt({ registry, config, context, microagents, plan }) {
   const sections = [];
 
-  // 1. Agent Identity (short)
+  // 1. Agent Identity (very short)
   const name = config.agent?.name || 'Pelulu';
-  sections.push(`You are ${name}, an AI coding agent. Help users with software tasks.`);
+  sections.push(`You are ${name}, a coding agent. Use tools to help.`);
 
-  // 2. Workspace Context (if available)
+  // 2. Workspace Context (minimal - just git branch and project type)
   if (context) {
-    sections.push(`## Context\n${context}`);
+    // Extract only essential info
+    const branchMatch = context.match(/Branch:\s*(\S+)/);
+    const typeMatch = context.match(/Type:\s*(\S+)/);
+    const minimal = [];
+    if (branchMatch) minimal.push(`git:${branchMatch[1]}`);
+    if (typeMatch) minimal.push(typeMatch[1]);
+    if (minimal.length > 0) {
+      sections.push(minimal.join(' | '));
+    }
   }
 
   // 3. Plan Status
