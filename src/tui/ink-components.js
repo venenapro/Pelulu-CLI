@@ -7,18 +7,18 @@ import { Box, Text, useStdin } from 'ink';
 import TextInput from 'ink-text-input';
 
 // ─── Status Bar ───────────────────────────────────────────
-export function StatusBar({ connected, session, toolCount, actionCount }) {
+export function StatusBar({ connected, session, version }) {
   return React.createElement(Box, {
     borderStyle: 'single', borderColor: 'cyan', width: '100%', paddingX: 0,
   },
-    React.createElement(Text, { color: 'cyan', bold: true }, ' pelulu '),
-    React.createElement(Text, { dimColor: true }, '│ '),
-    React.createElement(Text, { color: connected ? 'green' : 'red', dimColor: !connected },
-      connected ? 'on' : 'off'
+    React.createElement(Text, { color: 'cyan', bold: true }, ` pelulu-cli v.${version || '0.0.0'} `),
+    React.createElement(Text, { dimColor: true }, '| '),
+    React.createElement(Text, { color: connected ? 'green' : 'red', bold: connected },
+      connected ? 'ONLINE' : 'OFFLINE'
     ),
-    React.createElement(Text, { dimColor: true }, ` ${toolCount}t ${actionCount}a `),
-    React.createElement(Text, { dimColor: true }, '│ '),
+    React.createElement(Text, { dimColor: true }, ' | '),
     React.createElement(Text, { dimColor: true }, session ? session.slice(0, 8) : '-'),
+    React.createElement(Text, { dimColor: true }, ' | Provider: Xiaozhi.me'),
   );
 }
 
