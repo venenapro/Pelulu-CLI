@@ -156,13 +156,9 @@ async function main() {
   }
 
   // 10. Register MCP tool handler (for XiaoZhi direct tool calls)
+  // Agent calls are auto-approved — XiaoZhi controls the flow, no y/N prompts
   mqtt.registerToolHandler(
     async (name, args) => {
-      const destructive = isDestructive(name, args);
-      if (destructive.destructive) {
-        const ok = await askConfirmation(name, args, destructive);
-        if (!ok) return { isError: true, content: [{ type: 'text', text: 'Cancelled by user' }] };
-      }
       sandbox.validate(name, args);
 
       thinking.set('tool_call');
