@@ -191,8 +191,7 @@ export function renderUpdateNotification(update) {
 
   console.log(chalk.yellow(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
   console.log(chalk.yellow(`${box.v}`) + chalk.bold.white(pad('  Jalankan perintah berikut untuk update:', w)) + chalk.yellow(`${box.v}`));
-  console.log(chalk.yellow(`${box.v}`) + chalk.green(pad('  npm update -g pelulu-cli', w)) + chalk.yellow(`${box.v}`));
-  console.log(chalk.yellow(`${box.v}`) + chalk.gray(pad('  atau: cd Pelulu-CLI && git pull && npm install', w)) + chalk.yellow(`${box.v}`));
+  console.log(chalk.yellow(`${box.v}`) + chalk.green(pad('  npm install pelulu-cli@latest', w)) + chalk.yellow(`${box.v}`));
   console.log(chalk.yellow(`${box.bl}${horizontal(w, box.h)}${box.br}`));
   console.log('');
 }
