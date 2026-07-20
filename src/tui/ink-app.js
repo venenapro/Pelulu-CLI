@@ -170,6 +170,16 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
 
     // ─── Handle Submit ────────────────────────────────
     const handleSubmit = useCallback(async (text) => {
+      // Limit input to 70 chars (XiaoZhi limit)
+      const MAX_INPUT = 70;
+      if (text.length > MAX_INPUT) {
+        setMessages(prev => [...prev.slice(-maxMessages), {
+          id: `warn-${Date.now()}`, role: 'system', 
+          content: `⚠️ Input terlalu panjang (${text.length}/${MAX_INPUT} chars). Potong pesanmu ya!`,
+        }]);
+        return;
+      }
+
       // Add user message
       setMessages(prev => [...prev.slice(-maxMessages), {
         id: `user-${Date.now()}`, role: 'user', content: text,
@@ -248,6 +258,12 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
       
       const agentController = extras?.agentController;
       if (agentController) {
+        // Reset agent if it's stuck in running state
+        if (agentController.isRunning) {
+          agentController.abort();
+          await new Promise(r => setTimeout(r, 500));
+        }
+        
         // Use agent controller for proper response handling
         try {
           const result = await agentController.run(text, { generatePlan: false });
