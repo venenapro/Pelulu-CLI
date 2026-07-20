@@ -27,12 +27,12 @@ readPkgVersion();
 export function AsciiBanner({ version }) {
   const v = version || '0.0.0';
   const banner =
-    `  /\\_/\\      PELULU-CLI\n` +
-    ` ( o.o )    v${v}\n` +
-    `  > ^ <     coding companion\n` +
-    ` /|   |\\    powered by XiaoZhi\n` +
-    `(_|   |_)\n` +
-    `             18 tools • MCP protocol • agent mode`;
+    '  /\\_/\\      PELULU-CLI\n' +
+    ' ( o.o )    v' + v + '\n' +
+    '  > ^ <     coding companion\n' +
+    ' /|   |\\    powered by XiaoZhi\n' +
+    '(_|   |_)\n' +
+    '             18 tools \u2022 MCP protocol \u2022 agent mode';
 
   return React.createElement(Box, {
     paddingLeft: 1, paddingY: 0,
