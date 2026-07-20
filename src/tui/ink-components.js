@@ -28,11 +28,11 @@ export function AsciiBanner({ version }) {
   const v = version || '0.0.0';
 
   const cat = [
-    '  /\\_/\\   ',
-    '  ( o.o )  ',
-    '   > ^ <   ',
-    '  /|   |\\  ',
-    ' (_|   |_) ',
+    ' /\\_/\\  ',
+    '( o.o ) ',
+    ' > ^ <  ',
+    '/|   |\\ ',
+    '(_|   |_)',
   ];
   const info = [
     { text: 'P E L U L U - C L I', color: 'cyan', bold: true },

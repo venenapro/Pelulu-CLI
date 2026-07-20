@@ -59,7 +59,7 @@ async function main() {
   // 1b. Initialize file logging (deletes old logs, keeps only latest)
   const appName = config.agent?.name?.toLowerCase().replace(/\s+/g, '-') || 'pelulu';
   const logFile = await initFileLog(ROOT, appName);
-  log('info', `Log file: ${logFile}`);
+  debug('init', `Log file: ${logFile}`);
 
   // 2. Check for updates — block if outdated
   const update = await checkForUpdates(ROOT);
