@@ -28,7 +28,7 @@ import { MessageSender } from './mcp/message-sender.js';
 import { WssEndpoint } from './mcp/wss-endpoint.js';
 import { PluginManager } from './plugins/manager.js';
 import { checkForUpdates } from './core/update-checker.js';
-import { renderUpdateNotification } from './tui/renderer.js';
+import { renderUpdateNotification, renderAsciiBanner } from './tui/renderer.js';
 import { startInkTUI } from './tui/ink-entry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -60,6 +60,9 @@ async function main() {
   if (!config._wizard_done || args.includes('--wizard')) {
     await runWizard(ROOT);
   }
+
+  // Show ASCII banner before Ink takes over
+  renderAsciiBanner(config.agent?.version);
 
   // Redirect console.log to buffer — everything after this goes into Ink
   console.log = bufferLog;

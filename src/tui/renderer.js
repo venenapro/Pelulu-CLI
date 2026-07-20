@@ -23,6 +23,23 @@ function center(text, width) {
   return ' '.repeat(left) + text + ' '.repeat(width - left - text.length);
 }
 
+/**
+ * Render the Pelulu ASCII art banner (displayed once at startup)
+ */
+export function renderAsciiBanner(version) {
+  const v = version ? `v.${version}` : '';
+  const lines = [
+    chalk.cyan('  /\\_/\\  '),
+    chalk.cyan(' ( o.o ) ') + chalk.bold.cyan(` P E L U L U - C L I`),
+    chalk.cyan('  > ^ <  ') + chalk.gray(` ${v}  |  powered by XiaoZhi`),
+    chalk.cyan(' /|   |\\ '),
+    chalk.cyan('(_|   |_)') + chalk.dim('  the tiny coding companion'),
+  ];
+  console.log('');
+  for (const line of lines) console.log(line);
+  console.log('');
+}
+
 export function renderBanner(config, tools, connected, meta = {}) {
   const w = 48;
   const actions = tools.reduce((s, t) => s + (t.actions?.length || 0), 0);
