@@ -51,11 +51,19 @@ export class ToolRegistry {
   }
 
   toMcpTools() {
-    return this.all().map(t => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: t.inputSchema || { type: 'object', properties: {} },
-    }));
+    return this.all().map(t => {
+      const schema = t.inputSchema || { type: 'object', properties: {} };
+      const compact = { type: 'object', properties: {} };
+      // Send all properties with type + enum only (no descriptions)
+      if (schema.properties) {
+        for (const [k, v] of Object.entries(schema.properties)) {
+          const prop = { type: v.type };
+          if (v.enum) prop.enum = v.enum;
+          compact.properties[k] = prop;
+        }
+      }
+      return { name: t.name, description: t.description, inputSchema: compact };
+    });
   }
 
   async call(name, args = {}) {

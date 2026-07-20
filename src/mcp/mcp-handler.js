@@ -99,21 +99,16 @@ export class McpHandler {
   _optimizeTool(tool) {
     const optimized = {
       name: tool.name,
-      description: tool.description?.slice(0, 200) || '',
+      description: tool.description?.slice(0, 100) || '',
       inputSchema: { type: 'object', properties: {} }
     };
 
-    // Keep required array
-    if (tool.inputSchema?.required) {
-      optimized.inputSchema.required = tool.inputSchema.required;
-    }
-
-    // Optimize properties — keep enum + short description
+    // Keep first 4 properties only (to stay under 8KB MQTT limit)
     if (tool.inputSchema?.properties) {
-      for (const [key, val] of Object.entries(tool.inputSchema.properties)) {
+      const entries = Object.entries(tool.inputSchema.properties);
+      for (const [key, val] of entries.slice(0, 4)) {
         const prop = { type: val.type };
         if (val.enum) prop.enum = val.enum;
-        if (val.description) prop.description = val.description.slice(0, 80);
         optimized.inputSchema.properties[key] = prop;
       }
     }

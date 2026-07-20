@@ -83,6 +83,7 @@ export class MqttClient {
       type: 'hello', version: 3, transport: 'udp',
       features: { mcp: true },
       audio_params: { format: 'opus', sample_rate: 16000, channels: 1, frame_duration: 60 },
+      system_prompt: 'You are a coding assistant. When the user asks to create, write, or edit files, you MUST use the file tool with appropriate action (write/edit/mkdir). Always use tools to complete tasks. Do not just describe what to do — actually do it using the tools.',
     }));
   }
 
