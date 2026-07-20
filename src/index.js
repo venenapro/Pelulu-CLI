@@ -28,6 +28,7 @@ import { MessageSender } from './mcp/message-sender.js';
 import { WssEndpoint } from './mcp/wss-endpoint.js';
 import { PluginManager } from './plugins/manager.js';
 import { checkForUpdates } from './core/update-checker.js';
+import { renderUpdateNotification } from './tui/renderer.js';
 import { startInkTUI } from './tui/ink-entry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -41,12 +42,11 @@ async function main() {
   // 1. Load config
   const config = await loadConfig(ROOT);
 
-  // 2. Check for updates (print before Ink takes over terminal)
+  // 2. Check for updates — block if outdated
   const update = await checkForUpdates(ROOT);
   if (update.available) {
-    console.log(chalk.yellow(`\n  UPDATE TERSEDIA: v${update.local} -> v${update.remote}`));
-    console.log(chalk.cyan(`  ${update.release?.url || ''}`));
-    console.log(chalk.gray('  npm update -g pelulu-cli\n'));
+    renderUpdateNotification(update);
+    process.exit(1);
   }
 
   // 3. Workspace & wizard
