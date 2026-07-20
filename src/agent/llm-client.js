@@ -119,6 +119,15 @@ export class LLMClient {
   }
 
   /**
+   * Send prompt to LLM via MQTT (fire and forget)
+   * Response is handled by agent loop via events
+   */
+  async sendPrompt(prompt) {
+    debug('llm', `Sending prompt: ${prompt.length} chars`);
+    await this.#mqtt.sendText(prompt);
+  }
+
+  /**
    * Send messages to LLM via MQTT
    * Tools are sent via MCP tools/list, NOT in prompt!
    */

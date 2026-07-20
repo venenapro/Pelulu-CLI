@@ -113,9 +113,19 @@ export class MqttClient {
       if (r.type === 'mcp') { this._send(r); }
       else if (r.type === 'tool_call') {
         log('tool', r.name);
+        // Emit tool call event so agent can track it
+        bus.emit('mcp:tool_call', { name: r.name, args: r.args, id: r.id });
         this.mcp.executeTool(r.name, r.args)
-          .then(result => { log('tool', result.isError ? 'failed' : 'done'); this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result } }); })
-          .catch(err => { this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result: { content: [{ type: 'text', text: err.message }], isError: true } } }); });
+          .then(result => {
+            log('tool', result.isError ? 'failed' : 'done');
+            this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result } });
+            // Emit tool result event
+            bus.emit('mcp:tool_result', { name: r.name, args: r.args, result, id: r.id });
+          })
+          .catch(err => {
+            this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result: { content: [{ type: 'text', text: err.message }], isError: true } } });
+            bus.emit('mcp:tool_result', { name: r.name, args: r.args, result: { isError: true, content: [{ type: 'text', text: err.message }] }, id: r.id });
+          });
       }
     }
     if (this.mcp.toolsReceived && this._helloQueue.length) {
