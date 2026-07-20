@@ -2,7 +2,7 @@
  * Ink App — Main Pelulu TUI Application
  * Full React component with message list, input, status, thinking
  */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import {
   StatusBar, MessageBubble, ThinkingIndicator,
@@ -26,6 +26,15 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     const [logLine, setLogLine] = useState(_lastStartup);
     const logTimer = useRef(null);
     const maxMessages = 200;
+    const [scrollOffset, setScrollOffset] = useState(0); // 0 = bottom, N = scrolled up N messages
+    const scrollOffsetRef = useRef(0);
+
+    // Calculate how many rows are available for messages
+    const getAvailableRows = useCallback(() => {
+      const termRows = process.stdout.rows || 24;
+      // status bar (3) + log line (1) + input box (3) + padding (2) + thinking (1) = ~10
+      return Math.max(5, termRows - 10);
+    }, []);
 
     // ─── Enable Ink mode for logger ──────────────────
     useEffect(() => {
@@ -94,9 +103,15 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         if (ttsTimer) clearTimeout(ttsTimer);
         ttsTimer = setTimeout(() => {
           if (ttsBuffer) {
-            setMessages(prev => [...prev.slice(-maxMessages), {
-              id: Date.now().toString(), role: 'assistant', content: ttsBuffer,
-            }]);
+            setMessages(prev => {
+              const next = [...prev.slice(-maxMessages), {
+                id: Date.now().toString(), role: 'assistant', content: ttsBuffer,
+              }];
+              // Auto-scroll to bottom on new AI response
+              setScrollOffset(0);
+              scrollOffsetRef.current = 0;
+              return next;
+            });
             ttsBuffer = '';
           }
         }, 500);
@@ -125,6 +140,33 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     // ─── Keyboard shortcuts ─────────────────────────
     useInput((input, key) => {
       if (key.ctrl && input === 'c') exit();
+
+      // Scroll: Shift+Up / Shift+Down / PageUp / PageDown
+      if (key.shift && key.upArrow) {
+        setScrollOffset(prev => {
+          const next = Math.min(prev + 5, messages.length - 1);
+          scrollOffsetRef.current = next;
+          return next;
+        });
+      } else if (key.shift && key.downArrow) {
+        setScrollOffset(prev => {
+          const next = Math.max(0, prev - 5);
+          scrollOffsetRef.current = next;
+          return next;
+        });
+      } else if (key.pageUp) {
+        setScrollOffset(prev => {
+          const next = Math.min(prev + 20, messages.length - 1);
+          scrollOffsetRef.current = next;
+          return next;
+        });
+      } else if (key.pageDown) {
+        setScrollOffset(prev => {
+          const next = Math.max(0, prev - 20);
+          scrollOffsetRef.current = next;
+          return next;
+        });
+      }
     });
 
     // ─── Handle Submit ────────────────────────────────
@@ -146,6 +188,8 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         }
         if (cmd === '/clear') {
           setMessages([]);
+          setScrollOffset(0);
+          scrollOffsetRef.current = 0;
           return;
         }
         if (cmd === '/status') {
@@ -209,6 +253,15 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     const tools = registry.all();
     const actions = tools.reduce((s, t) => s + (t.actions?.length || 0), 0);
 
+    // Calculate visible messages (scrollable window)
+    const availableRows = getAvailableRows();
+    const totalMessages = messages.length;
+    const endIdx = totalMessages - scrollOffset;
+    const startIdx = Math.max(0, endIdx - availableRows);
+    const visibleMessages = messages.slice(startIdx, endIdx);
+    const canScrollUp = scrollOffset < totalMessages - 1;
+    const canScrollDown = scrollOffset > 0;
+
     return React.createElement(Box, {
       flexDirection: 'column', width: '100%',
     },
@@ -225,19 +278,35 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
           )
         : null,
 
-      // Middle: Messages
+      // Scroll indicator (only when scrolled up)
+      canScrollUp
+        ? React.createElement(Box, { paddingLeft: 2 },
+            React.createElement(Text, { dimColor: true, color: 'yellow' },
+              `[${totalMessages - endIdx} more above | Shift+Up/Down or PgUp/PgDn to scroll]`
+            ),
+          )
+        : null,
+
+      // Middle: Messages (scrollable window)
       React.createElement(Box, {
         flexDirection: 'column', paddingY: 1,
       },
-        messages.length === 0
+        totalMessages === 0
           ? React.createElement(Box, { paddingLeft: 2 },
               React.createElement(Text, { dimColor: true },
                 'type a message to get started. tab for autocomplete. /help for commands.'
               ),
             )
-          : messages.map((msg) =>
+          : visibleMessages.map((msg) =>
               React.createElement(MessageBubble, { key: msg.id, message: msg })
             ),
+        canScrollDown
+          ? React.createElement(Box, { paddingLeft: 2 },
+              React.createElement(Text, { dimColor: true, color: 'yellow' },
+                `[${scrollOffset} more below | Shift+Down or PgDn to scroll to bottom]`
+              ),
+            )
+          : null,
         React.createElement(ThinkingIndicator, { state: thinking }),
       ),
 
