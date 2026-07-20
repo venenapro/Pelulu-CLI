@@ -104,6 +104,7 @@ export class McpHandler {
     };
 
     // Keep first 4 properties only (to stay under 8KB MQTT limit)
+    // action + first 3 params — enough for XiaoZhi to understand the tool
     if (tool.inputSchema?.properties) {
       const entries = Object.entries(tool.inputSchema.properties);
       for (const [key, val] of entries.slice(0, 4)) {
