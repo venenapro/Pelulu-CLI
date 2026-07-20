@@ -1,8 +1,8 @@
 /**
  * LLMClient — Unified LLM interface for XiaoZhi AI
  * 
- * Wraps XiaoZhi's MQTT-based LLM into a standard chat interface
- * that supports tool calling and streaming.
+ * Wraps XiaoZhi's MQTT-based LLM into a standard chat interface.
+ * XiaoZhi returns plain text, so tool calls are parsed from JSON in the response.
  */
 import { bus } from '../core/event-bus.js';
 import { log, debug } from '../core/logger.js';
@@ -14,17 +14,66 @@ export class LLMClient {
   #pendingRequests = new Map();
   #model = null;
   #usage = { total_tokens: 0, cost: 0 };
+  #responseBuffer = '';
+  #responseTimer = null;
+  #collecting = false;
 
   constructor(mqtt, config) {
     this.#mqtt = mqtt;
     this.#config = config;
 
-    // Listen for LLM responses
-    bus.on('llm:response', (data) => this.#handleResponse(data));
+    // Listen for LLM text responses from MQTT
+    bus.on('llm:text', (text) => this.#onLlmText(text));
   }
 
   get model() { return this.#model; }
   get usage() { return { ...this.#usage }; }
+
+  /**
+   * Handle incoming LLM text from MQTT
+   * XiaoZhi may send multiple messages for one response, so we buffer them
+   */
+  #onLlmText(text) {
+    if (!this.#collecting) return;
+
+    this.#responseBuffer += text;
+
+    // Reset the "done" timer - if no new text comes for 2 seconds, consider response complete
+    if (this.#responseTimer) clearTimeout(this.#responseTimer);
+    this.#responseTimer = setTimeout(() => this.#finalizeResponse(), 2000);
+  }
+
+  /**
+   * Finalize the collected response and resolve the pending request
+   */
+  #finalizeResponse() {
+    if (!this.#collecting) return;
+    this.#collecting = false;
+    this.#responseTimer = null;
+
+    const content = this.#responseBuffer.trim();
+    this.#responseBuffer = '';
+
+    // Get the oldest pending request
+    const entries = [...this.#pendingRequests.entries()];
+    if (entries.length === 0) return;
+
+    const [id, pending] = entries[0];
+    clearTimeout(pending.timer);
+    this.#pendingRequests.delete(id);
+
+    // Parse tool calls from the response
+    const toolCalls = this.#parseToolCalls(content);
+    const cleanContent = toolCalls ? this.#stripToolCalls(content) : content;
+
+    debug('llm', `Response resolved: ${cleanContent.length} chars, ${toolCalls?.length || 0} tool calls`);
+
+    pending.resolve({
+      content: cleanContent,
+      tool_calls: toolCalls || [],
+      usage: {},
+    });
+  }
 
   /**
    * Send messages to LLM and get response
@@ -41,6 +90,8 @@ export class LLMClient {
       const timeout = this.#config.llm?.timeout || 120000;
       const timer = setTimeout(() => {
         this.#pendingRequests.delete(id);
+        this.#collecting = false;
+        this.#responseBuffer = '';
         reject(new Error('LLM request timed out'));
       }, timeout);
 
@@ -49,12 +100,18 @@ export class LLMClient {
         signal.addEventListener('abort', () => {
           clearTimeout(timer);
           this.#pendingRequests.delete(id);
+          this.#collecting = false;
+          this.#responseBuffer = '';
           reject(new Error('AbortError'));
         }, { once: true });
       }
 
       // Store pending request
       this.#pendingRequests.set(id, { resolve, reject, timer });
+
+      // Start collecting response
+      this.#collecting = true;
+      this.#responseBuffer = '';
 
       // Send to XiaoZhi via MQTT
       this.#sendToLLM(id, messages, tools);
@@ -86,8 +143,9 @@ export class LLMClient {
       if (pending) {
         clearTimeout(pending.timer);
         this.#pendingRequests.delete(requestId);
-        pending.reject(err);
       }
+      this.#collecting = false;
+      throw err;
     }
   }
 
@@ -151,47 +209,16 @@ export class LLMClient {
   }
 
   /**
-   * Handle LLM response from MQTT
-   */
-  #handleResponse(data) {
-    const { requestId, content, tool_calls, usage, error } = data;
-
-    const pending = this.#pendingRequests.get(requestId);
-    if (!pending) return;
-
-    clearTimeout(pending.timer);
-    this.#pendingRequests.delete(requestId);
-
-    if (error) {
-      pending.reject(new Error(error));
-      return;
-    }
-
-    // Update usage
-    if (usage) {
-      this.#usage.total_tokens += usage.total_tokens || 0;
-      this.#usage.cost += usage.cost || 0;
-    }
-
-    // Parse tool calls from content if not provided directly
-    let parsedToolCalls = tool_calls;
-    if (!parsedToolCalls && content) {
-      parsedToolCalls = this.#parseToolCalls(content);
-    }
-
-    pending.resolve({
-      content: this.#stripToolCalls(content),
-      tool_calls: parsedToolCalls || [],
-      usage: usage || {},
-    });
-  }
-
-  /**
    * Parse tool calls from text content
    * Looks for JSON objects with "tool" key
    */
   #parseToolCalls(content) {
+    if (!content) return null;
+
     const toolCalls = [];
+    
+    // Match JSON objects that have a "tool" key
+    // Support both single-line and multi-line JSON
     const jsonPattern = /\{[^{}]*"tool"\s*:\s*"[^"]+[^{}]*\}/g;
     const matches = content.match(jsonPattern);
 
@@ -240,5 +267,7 @@ export class LLMClient {
       pending.reject(new Error('Cleared'));
     }
     this.#pendingRequests.clear();
+    this.#collecting = false;
+    this.#responseBuffer = '';
   }
 }
