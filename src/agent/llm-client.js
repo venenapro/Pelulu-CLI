@@ -121,10 +121,21 @@ export class LLMClient {
   /**
    * Send prompt to LLM via MQTT (fire and forget)
    * Response is handled by agent loop via events
+   * XiaoZhi has ~70 char limit per message!
    */
   async sendPrompt(prompt) {
-    debug('llm', `Sending prompt: ${prompt.length} chars`);
-    await this.#mqtt.sendText(prompt);
+    const MAX_LEN = 70;
+    
+    if (prompt.length <= MAX_LEN) {
+      debug('llm', `Sending prompt: ${prompt.length} chars`);
+      await this.#mqtt.sendText(prompt);
+    } else {
+      // Truncate and add context hint
+      const truncated = prompt.slice(0, MAX_LEN - 10) + '...';
+      debug('llm', `Truncated ${prompt.length} → ${truncated.length} chars`);
+      log('warn', `Prompt too long (${prompt.length} chars), truncated to ${MAX_LEN}`);
+      await this.#mqtt.sendText(truncated);
+    }
   }
 
   /**

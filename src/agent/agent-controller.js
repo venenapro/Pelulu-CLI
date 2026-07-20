@@ -164,16 +164,42 @@ export class AgentController {
         plan: this.#planManager.currentPlan,
       });
 
+      // If prompt is too long for XiaoZhi, break it into steps first
+      const MAX_PROMPT_LEN = 70;
+      let effectivePrompt = userPrompt;
+      
+      if (userPrompt.length > MAX_PROMPT_LEN) {
+        debug('agent', `Prompt too long (${userPrompt.length} chars), breaking into steps`);
+        bus.emit('agent:decomposing', { task: userPrompt });
+        
+        // Ask XiaoZhi to break it down (using shorter prompt)
+        const shortPrompt = userPrompt.slice(0, MAX_PROMPT_LEN - 20) + '...';
+        const decomposeResult = await this.#loop.run(shortPrompt, {
+          llm: this.#llm,
+          tools: this.#registry,
+          context,
+          systemPrompt: 'Break this task into 2-3 short steps. Each step max 50 chars.',
+          sandbox: this.#sandbox,
+          confirm: this.#confirm,
+        });
+        
+        // Use the decomposed result as the effective prompt
+        if (decomposeResult.success && decomposeResult.result) {
+          effectivePrompt = decomposeResult.result;
+          debug('agent', `Decomposed to: ${effectivePrompt}`);
+        }
+      }
+
       // Check if we need to generate a plan
       const shouldPlan = options.generatePlan ||
-        (this.#config.agent?.auto_plan && this.#isComplexTask(userPrompt));
+        (this.#config.agent?.auto_plan && this.#isComplexTask(effectivePrompt));
 
       if (shouldPlan && !this.#planManager.currentPlan) {
         debug('agent', 'Generating plan...');
-        bus.emit('agent:planning', { task: userPrompt });
+        bus.emit('agent:planning', { task: effectivePrompt });
 
         await this.#planManager.generatePlan(
-          userPrompt,
+          effectivePrompt,
           this.#llm,
           context
         );
@@ -188,7 +214,7 @@ export class AgentController {
       }
 
       // Run the agent loop
-      const result = await this.#loop.run(userPrompt, {
+      const result = await this.#loop.run(effectivePrompt, {
         llm: this.#llm,
         tools: this.#registry,
         context,
