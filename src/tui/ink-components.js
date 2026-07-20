@@ -28,35 +28,34 @@ export function AsciiBanner({ version }) {
   const v = version || '0.0.0';
 
   const cat = [
-    '   /\\_/\\  ',
-    '  ( o.o ) ',
-    '   > ^ <  ',
-    '  /|   |\\ ',
-    ' (_|   |_)',
+    '  /\\_/\\   ',
+    '  ( o.o )  ',
+    '   > ^ <   ',
+    '  /|   |\\  ',
+    ' (_|   |_) ',
   ];
   const info = [
-    'P E L U L U - C L I',
-    `v${v}`,
-    'coding companion',
-    'powered by XiaoZhi',
-    '',
+    { text: 'P E L U L U - C L I', color: 'cyan', bold: true },
+    { text: `v${v}`, color: 'gray' },
+    { text: 'coding companion', color: 'cyanBright' },
+    { text: 'powered by XiaoZhi', color: 'gray' },
+    null,
   ];
 
   return React.createElement(Box, {
     flexDirection: 'column', width: '100%',
-    borderStyle: 'single', borderColor: 'cyan',
-    paddingY: 0, paddingX: 0,
+    paddingY: 0, paddingLeft: 1,
   },
     ...cat.map((line, i) =>
-      React.createElement(Box, { key: i, paddingLeft: 1 },
+      React.createElement(Box, { key: i },
         React.createElement(Text, { color: 'cyan' }, line),
-        React.createElement(Text, { color: i === 0 ? 'cyan' : i === 1 ? 'gray' : i === 2 ? 'cyanBright' : 'gray', bold: i === 0 },
-          '    ' + (info[i] || '')
-        ),
+        info[i]
+          ? React.createElement(Text, { color: info[i].color, bold: info[i].bold }, '  ' + info[i].text)
+          : null,
       )
     ),
-    React.createElement(Box, { paddingLeft: 1 },
-      React.createElement(Text, { dimColor: true }, '  18 tools  •  MCP protocol  •  agent mode  •  xiaozhi.me'),
+    React.createElement(Box, null,
+      React.createElement(Text, { dimColor: true }, '            18 tools  •  MCP protocol  •  agent mode'),
     ),
   );
 }
