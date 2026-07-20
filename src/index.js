@@ -2,6 +2,12 @@
 /**
  * Pelulu CLI — Entry Point
  * Ink-based TUI with React components
+ * 
+ * Now with OpenHands-style agent capabilities:
+ * - Agent Loop (observe→think→act)
+ * - Plan Management
+ * - Enhanced Context
+ * - History Condensation
  */
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -13,7 +19,6 @@ import { ToolRegistry } from './core/tool-registry.js';
 import { Sandbox } from './core/sandbox.js';
 import { SessionState } from './core/session.js';
 import { Stats } from './core/stats.js';
-import { buildSystemPrompt } from './core/system-prompt.js';
 import { buildContext } from './core/context.js';
 import { isDestructive, askConfirmation } from './core/confirm.js';
 import { runWizard } from './core/wizard.js';
@@ -31,12 +36,16 @@ import { checkForUpdates } from './core/update-checker.js';
 import { renderUpdateNotification, renderAsciiBanner } from './tui/renderer.js';
 import { startInkTUI } from './tui/ink-entry.js';
 
+// Import new agent system
+import { AgentController } from './agent/agent-controller.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
 const args = process.argv.slice(2);
 if (args.includes('--debug')) setDebug(true);
 const LIST_TOOLS = args.includes('--list-tools');
+const NO_AGENT = args.includes('--no-agent');
 
 async function main() {
   // Buffer ALL startup logs for Ink to display inside TUI
@@ -95,7 +104,6 @@ async function main() {
 
   // 6. Build context & system prompt
   const context = await buildContext();
-  const systemPrompt = buildSystemPrompt(registry, config);
 
   // 7. Connect to XiaoZhi
   const mqtt = new MqttClient(config);
@@ -125,7 +133,26 @@ async function main() {
   // 8. Message sender
   const sender = new MessageSender(mqtt);
 
-  // 9. Register MCP tool handler
+  // 9. Initialize Agent Controller (OpenHands-style)
+  let agentController = null;
+  if (!NO_AGENT) {
+    agentController = new AgentController({
+      registry,
+      mqtt,
+      sandbox,
+      confirm: { isDestructive, ask: askConfirmation },
+      config,
+    });
+
+    // Load microagents from workspace
+    await agentController.loadMicroagents(cwd);
+
+    startupLogs.push(chalk.green('  ✓ Agent system initialized (OpenHands-style)'));
+    startupLogs.push(chalk.gray(`    - Max iterations: ${config.agent?.max_iterations || 100}`));
+    startupLogs.push(chalk.gray(`    - Auto-plan: ${config.agent?.auto_plan ? 'enabled' : 'disabled'}`));
+  }
+
+  // 10. Register MCP tool handler (for XiaoZhi direct tool calls)
   mqtt.registerToolHandler(
     async (name, args) => {
       const destructive = isDestructive(name, args);
@@ -158,7 +185,7 @@ async function main() {
     () => registry.toMcpTools()
   );
 
-  // 10. Optional WSS endpoint
+  // 11. Optional WSS endpoint
   let wss = null;
   if (config.mcp?.endpoint_url) {
     wss = new WssEndpoint(config.mcp.endpoint_url, () => registry.toMcpTools(), async (name, args) => {
@@ -168,22 +195,26 @@ async function main() {
     wss.start();
   }
 
-  // 11. Track conversation
+  // 12. Track conversation
   bus.on('user:text', (text) => session.addUserMessage(text));
   bus.on('llm:text', (text) => session.addAiMessage(text));
 
-  // 12. Save config
+  // 13. Save config
   await saveConfig(ROOT, config);
 
-  // 13. Start Ink TUI
+  // 14. Start Ink TUI
   const { unmount, waitUntilExit } = startInkTUI({
     registry, mqtt, stats, session, bus, config,
-    extras: { fileTracker, thinking, sender, autoFormat, startupLogs },
+    extras: {
+      fileTracker, thinking, sender, autoFormat, startupLogs,
+      agentController, // Pass agent controller to TUI
+    },
   });
 
   // Graceful shutdown
   const shutdown = async () => {
     unmount();
+    if (agentController) agentController.abort();
     if (wss) wss.stop();
     await registry.shutdown();
     mqtt.disconnect();

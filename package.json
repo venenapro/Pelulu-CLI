@@ -1,6 +1,6 @@
 {
   "name": "pelulu-cli",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "CLI coding agent powered by XiaoZhi AI — a tiny Chinese LLM that lives in ESP32 chips",
   "type": "module",
   "main": "src/index.js",
@@ -11,6 +11,7 @@
     "start": "node src/index.js",
     "start:debug": "node src/index.js --debug",
     "start:fallback": "node src/index.js --no-ink",
+    "start:no-agent": "node src/index.js --no-agent",
     "tools": "node src/index.js --list-tools",
     "test": "node src/index.js --test"
   },
