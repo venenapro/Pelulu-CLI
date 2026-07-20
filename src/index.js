@@ -13,7 +13,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { loadConfig, saveConfig } from './core/config.js';
-import { log, setDebug, initFileLog, flushLogs, getLogFile, writeRawToLog } from './core/logger.js';
+import { log, setDebug, setInkMode, initFileLog, flushLogs, getLogFile, writeRawToLog } from './core/logger.js';
 import { bus } from './core/event-bus.js';
 import { ToolRegistry } from './core/tool-registry.js';
 import { Sandbox } from './core/sandbox.js';
@@ -60,6 +60,11 @@ async function main() {
   const appName = config.agent?.name?.toLowerCase().replace(/\s+/g, '-') || 'pelulu';
   const logFile = await initFileLog(ROOT, appName);
   debug('init', `Log file: ${logFile}`);
+
+  // 1c. Enable Ink mode early — route ALL logs through bus (no console.log leak)
+  if (process.stdin.isTTY) {
+    setInkMode(true, bus);
+  }
 
   // 2. Check for updates — block if outdated
   const update = await checkForUpdates(ROOT);
