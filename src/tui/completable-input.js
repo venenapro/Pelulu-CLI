@@ -2,7 +2,7 @@
  * CompletableInput — TextInput with Tab auto-completion + char counter
  * Wraps ink-text-input and adds completion support
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { getCompletions } from '../core/completion.js';
@@ -19,7 +19,7 @@ export function CompletableInput({ onSubmit, placeholder }) {
   const charCount = value.length;
   const remaining = MAX_CHARS - charCount;
 
-  // Handle Tab for completion
+  // Handle Tab/Escape/Return — regular chars are handled by TextInput
   useInput((input, key) => {
     if (key.tab) {
       if (!showCompletions) {
@@ -29,7 +29,6 @@ export function CompletableInput({ onSubmit, placeholder }) {
           setCompletionIndex(0);
           setShowCompletions(true);
           if (hits.length === 1) {
-            // Only auto-fill if within limit
             const filled = hits[0] + ' ';
             if (filled.length <= MAX_CHARS) {
               setValue(filled);
@@ -51,24 +50,22 @@ export function CompletableInput({ onSubmit, placeholder }) {
     } else if (key.return) {
       setShowCompletions(false);
       setCompletions([]);
-    } else {
-      if (showCompletions) {
-        setShowCompletions(false);
-        setCompletions([]);
-        setCompletionIndex(0);
-      }
     }
+    // All other keys: let TextInput handle them (no-op here)
   });
 
-  // Update value from TextInput
+  // Update value from TextInput — stable reference, no deps
   const handleChange = useCallback((val) => {
-    // Enforce max chars
     const trimmed = val.slice(0, MAX_CHARS);
     setValue(trimmed);
+  }, []);
 
-    if (trimmed.length > 0) {
-      const hits = getCompletions(trimmed);
-      if (hits.length > 0 && hits[0] !== trimmed) {
+  // Derive completions from value (debounced via useEffect to avoid
+  // extra re-renders on every character)
+  useEffect(() => {
+    if (value.length > 0) {
+      const hits = getCompletions(value);
+      if (hits.length > 0 && hits[0] !== value) {
         setCompletions(hits);
         setShowCompletions(true);
         setCompletionIndex(0);
@@ -78,7 +75,7 @@ export function CompletableInput({ onSubmit, placeholder }) {
     } else {
       setShowCompletions(false);
     }
-  }, []);
+  }, [value]);
 
   // Handle TextInput submit
   const handleSubmit = useCallback((val) => {

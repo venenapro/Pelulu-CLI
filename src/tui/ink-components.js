@@ -24,10 +24,11 @@ async function readPkgVersion() {
 readPkgVersion();
 
 // ─── ASCII Banner ────────────────────────────────────────
-export function AsciiBanner({ version }) {
+// Memoized — only re-renders when version prop changes
+export const AsciiBanner = React.memo(function AsciiBanner({ version }) {
   const v = version || '0.0.0';
   return React.createElement(Box, {
-    flexDirection: 'column', paddingLeft: 1, paddingY: 0,
+    flexDirection: 'column', paddingLeft: 1,
   },
     React.createElement(Box, null,
       React.createElement(Text, { color: 'cyan' }, '  /\\_/\\      '),
@@ -39,10 +40,11 @@ export function AsciiBanner({ version }) {
     React.createElement(Text, { color: 'cyan' }, '(_|   |_)'),
     React.createElement(Text, { dimColor: true }, '             18 tools • MCP protocol • agent mode'),
   );
-}
+});
 
 // ─── Status Bar ───────────────────────────────────────────
-export function StatusBar({ connected, session }) {
+// Memoized — only re-renders when connected/session changes
+export const StatusBar = React.memo(function StatusBar({ connected, session }) {
   const statusDot = connected ? '●' : '○';
   const statusColor = connected ? 'green' : 'red';
   const sess = session ? session.slice(0, 8) : '---';
@@ -65,7 +67,7 @@ export function StatusBar({ connected, session }) {
       React.createElement(Text, { dimColor: true }, 'xiaozhi.me'),
     ),
   );
-}
+});
 
 // ─── Strip Emojis ─────────────────────────────────────────
 export function stripEmojis(text) {
