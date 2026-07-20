@@ -9,7 +9,7 @@ export function showDiff(oldText, newText, filePath) {
   const newLines = newText.split('\n');
   const maxLen = Math.max(oldLines.length, newLines.length);
 
-  console.log(`\n${COLORS.bold}📝 Changes: ${filePath || ''}${COLORS.reset}\n`);
+  console.log(`\n${COLORS.bold}[EDIT] Changes: ${filePath || ''}${COLORS.reset}\n`);
 
   let changes = 0;
   for (let i = 0; i < maxLen; i++) {
@@ -30,7 +30,7 @@ export function showDiff(oldText, newText, filePath) {
 }
 
 export function showPatch(filePath, hunks) {
-  console.log(`\n${COLORS.bold}📝 Patch: ${filePath}${COLORS.reset}\n`);
+  console.log(`\n${COLORS.bold}[EDIT] Patch: ${filePath}${COLORS.reset}\n`);
   for (const hunk of hunks) {
     console.log(`${COLORS.cyan}@@ ${hunk.header || ''} @@${COLORS.reset}`);
     for (const line of hunk.lines) {
@@ -43,8 +43,8 @@ export function showPatch(filePath, hunks) {
 }
 
 export function formatFileChange(action, path, details) {
-  const icons = { created: '✨', modified: '📝', deleted: '🗑️', renamed: '📎' };
-  const icon = icons[action] || '📄';
+  const icons = { created: '[NEW]', modified: '[EDIT]', deleted: '[DEL]', renamed: '[REN]' };
+  const icon = icons[action] || '[FILE]';
   const detailStr = details ? ` ${COLORS.dim}(${details})${COLORS.reset}` : '';
   return `${icon} ${action}: ${path}${detailStr}`;
 }

@@ -39,11 +39,11 @@ export class Spinner {
   }
 
   success(text) {
-    this.stop(`${COLORS.green}✅ ${text}${COLORS.reset}`);
+    this.stop(`${COLORS.green}[OK] ${text}${COLORS.reset}`);
   }
 
   fail(text) {
-    this.stop(`${COLORS.red}❌ ${text}${COLORS.reset}`);
+    this.stop(`${COLORS.red}[ERR] ${text}${COLORS.reset}`);
   }
 }
 

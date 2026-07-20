@@ -33,7 +33,7 @@ export async function loadConfig(root) {
     agent: { name: 'Pelulu CLI', version: '1.0.0', workspace: '~/Pelulu-CLI' },
     mqtt: { ota_url: 'https://api.tenclass.net/xiaozhi/ota/', keepalive: 240 },
     mcp: { endpoint_url: '' },
-    tools: { shell_timeout: 30000, max_output: 10000 },
+    tools: { shell_timeout: 30000, max_output: 10000, auto_format: true },
     plugins: { enabled: [], disabled: [] },
   };
 

@@ -71,7 +71,7 @@ const ACTIONS = {
       for (const [file, content] of Object.entries(files)) {
         await writeFile(join(dir, file), content);
       }
-      log('template', `📁 Created ${template}: ${dir}`);
+      log('template', `[DIR] Created ${template}: ${dir}`);
       return { created: true, template, path: dir, files: Object.keys(files) };
     },
   },

@@ -88,20 +88,28 @@ async function main() {
   // 7. Connect to XiaoZhi
   const mqtt = new MqttClient(config);
 
+  // Buffer startup log messages for Ink to display
+  const startupLogs = [];
+  const origLog = console.log;
+  const bufferLog = (...args) => startupLogs.push(args.join(' '));
+
   bus.on('activation:required', ({ code }) => {
-    // Activation must happen before Ink renders
-    console.log('');
-    console.log(`  Kode Aktivasi: ${code}`);
-    console.log(`  https://xiaozhi.me`);
-    console.log('');
+    origLog('');
+    origLog(`  Kode Aktivasi: ${code}`);
+    origLog(`  https://xiaozhi.me`);
+    origLog('');
   });
 
+  // Temporarily redirect console.log to buffer during MQTT connect
+  console.log = bufferLog;
   try {
     await withRetry(() => mqtt.connect(), { maxRetries: 2, delay: 2000 });
   } catch (e) {
+    console.log = origLog;
     console.error(chalk.red(`\n  Connection failed: ${e.message}\n`));
     process.exit(1);
   }
+  console.log = origLog;
 
   // 8. Message sender
   const sender = new MessageSender(mqtt);
@@ -159,7 +167,7 @@ async function main() {
   // 13. Start Ink TUI
   const { unmount, waitUntilExit } = startInkTUI({
     registry, mqtt, stats, session, bus, config,
-    extras: { fileTracker, thinking, sender, autoFormat },
+    extras: { fileTracker, thinking, sender, autoFormat, startupLogs },
   });
 
   // Graceful shutdown

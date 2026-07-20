@@ -15,7 +15,8 @@
   },
   "tools": {
     "shell_timeout": 30000,
-    "max_output": 10000
+    "max_output": 10000,
+    "auto_format": true
   },
   "plugins": {
     "enabled": [],

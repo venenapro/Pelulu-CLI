@@ -99,7 +99,7 @@ export function showToolHelp(toolName) {
     return;
   }
 
-  console.log(`\n${COLORS.bold}📖 ${toolName} — Examples:${COLORS.reset}\n`);
+  console.log(`\n${COLORS.bold}[DOC] ${toolName} — Examples:${COLORS.reset}\n`);
   for (const ex of examples) {
     console.log(`  ${COLORS.cyan}${ex}${COLORS.reset}`);
   }
@@ -108,7 +108,7 @@ export function showToolHelp(toolName) {
 
 export function showAllToolHelp() {
   for (const [tool, examples] of Object.entries(TOOL_EXAMPLES)) {
-    console.log(`\n${COLORS.bold}📖 ${tool}:${COLORS.reset}`);
+    console.log(`\n${COLORS.bold}[DOC] ${tool}:${COLORS.reset}`);
     for (const ex of examples.slice(0, 2)) {
       console.log(`  ${COLORS.cyan}${ex}${COLORS.reset}`);
     }

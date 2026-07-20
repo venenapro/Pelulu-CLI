@@ -34,7 +34,7 @@ const ACTIONS = {
     required: ['pattern'],
     handler: async ({ pattern, path, ignoreCase, include, context }) => {
       if (!pattern) throw new Error('pattern required');
-      log('search', `🔍 grep: ${pattern}`);
+      log('search', `[FIND] grep: ${pattern}`);
       const flags = ignoreCase ? '-rn' : '-rn';
       const ic = ignoreCase ? 'i' : '';
       const inc = include ? `--include="*.${include}"` : '';
@@ -49,7 +49,7 @@ const ACTIONS = {
   find: {
     required: ['name'],
     handler: async ({ name, path, type }) => {
-      log('search', `🔍 find: ${name}`);
+      log('search', `[FIND] find: ${name}`);
       const t = type ? `-type ${type}` : '';
       const cmd = `find "${path || '.'}" ${t} -name "${name}" 2>/dev/null | head -50`;
       const r = await runCmd(cmd);
@@ -60,7 +60,7 @@ const ACTIONS = {
   web: {
     required: ['url'],
     handler: async ({ url, maxChars }) => {
-      log('search', `🌐 fetch: ${url}`);
+      log('search', `[WEB] fetch: ${url}`);
       const r = await httpGet(url, maxChars || 8000);
       return { url, status: r.status, body: r.body.slice(0, maxChars || 8000), length: r.body.length };
     },

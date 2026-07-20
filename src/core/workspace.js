@@ -82,15 +82,15 @@ export async function detectWorkspace(dir) {
 
 export function formatWorkspace(info) {
   const lines = [
-    `📁 ${info.name} (${info.type})`,
+    `[DIR] ${info.name} (${info.type})`,
     `   Language: ${info.language}`,
     `   Path: ${info.path}`,
   ];
   if (info.version) lines.push(`   Version: ${info.version}`);
   if (info.scripts?.length) lines.push(`   Scripts: ${info.scripts.join(', ')}`);
   if (info.dirs?.length) lines.push(`   Dirs: ${info.dirs.join(', ')}`);
-  if (info.hasGit) lines.push('   Git: ✅');
-  if (info.hasDocker) lines.push('   Docker: ✅');
-  if (info.hasCI) lines.push('   CI: ✅');
+  if (info.hasGit) lines.push('   Git: [OK]');
+  if (info.hasDocker) lines.push('   Docker: [OK]');
+  if (info.hasCI) lines.push('   CI: [OK]');
   return lines.join('\n');
 }

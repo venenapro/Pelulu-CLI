@@ -21,7 +21,7 @@ export function handleError(error) {
   const code = error.code || error.constructor?.name || 'UNKNOWN';
   const suggestion = ERROR_SUGGESTIONS[code]?.(error) || null;
 
-  const lines = [`${COLORS.red}❌ ${error.message}${COLORS.reset}`];
+  const lines = [`${COLORS.red}[ERR] ${error.message}${COLORS.reset}`];
   if (suggestion) lines.push(`${COLORS.yellow}💡 ${suggestion}${COLORS.reset}`);
 
   return lines.join('\n');

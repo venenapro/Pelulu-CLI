@@ -41,9 +41,9 @@ export class Stats {
   formatReport() {
     const s = this.getSummary();
     const lines = [
-      `📊 Session Stats`,
+      `[STATS] Session Stats`,
       `   Uptime: ${s.uptime}s`,
-      `   Tool calls: ${s.total} (${s.success} ✅ / ${s.failed} ❌)`,
+      `   Tool calls: ${s.total} (${s.success} [OK] / ${s.failed} [ERR])`,
       `   Avg duration: ${s.avgDuration}ms`,
     ];
     if (s.topTools.length) {

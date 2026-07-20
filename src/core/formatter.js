@@ -25,35 +25,35 @@ function tryParse(text) {
 }
 
 function formatError(text) {
-  return `${COLORS.red}❌ ${text}${COLORS.reset}`;
+  return `${COLORS.red}[ERR] ${text}${COLORS.reset}`;
 }
 
 function formatFileResult(action, data) {
   if (action === 'read') {
     const lines = data.content?.split('\n').length || 0;
-    return `${COLORS.green}✅${COLORS.reset} ${data.path} (${lines} lines, ${data.totalSize} chars)`;
+    return `${COLORS.green}[OK]${COLORS.reset} ${data.path} (${lines} lines, ${data.totalSize} chars)`;
   }
-  if (action === 'write') return `${COLORS.green}✅${COLORS.reset} Written: ${data.path} (${data.written} chars)`;
-  if (action === 'edit') return `${COLORS.green}✅${COLORS.reset} Edited: ${data.path} (${data.occurrences} occurrence(s))`;
+  if (action === 'write') return `${COLORS.green}[OK]${COLORS.reset} Written: ${data.path} (${data.written} chars)`;
+  if (action === 'edit') return `${COLORS.green}[OK]${COLORS.reset} Edited: ${data.path} (${data.occurrences} occurrence(s))`;
   if (action === 'list') {
     const dirs = data.items?.filter(i => i.type === 'dir').length || 0;
     const files = data.items?.filter(i => i.type === 'file').length || 0;
-    return `${COLORS.green}✅${COLORS.reset} ${data.path}: ${dirs} dirs, ${files} files`;
+    return `${COLORS.green}[OK]${COLORS.reset} ${data.path}: ${dirs} dirs, ${files} files`;
   }
-  if (action === 'exists') return data.exists ? `✅ ${data.type}: ${data.path}` : `❌ Not found: ${data.path}`;
-  if (action === 'delete') return `${COLORS.yellow}🗑️${COLORS.reset} Deleted: ${data.path}`;
-  return `${COLORS.green}✅${COLORS.reset} ${action}: ${JSON.stringify(data)}`;
+  if (action === 'exists') return data.exists ? `[OK] ${data.type}: ${data.path}` : `[ERR] Not found: ${data.path}`;
+  if (action === 'delete') return `${COLORS.yellow}[DEL]${COLORS.reset} Deleted: ${data.path}`;
+  return `${COLORS.green}[OK]${COLORS.reset} ${action}: ${JSON.stringify(data)}`;
 }
 
 function formatGitResult(action, data) {
   if (action === 'status') {
     const dirty = data.dirty ? `${COLORS.yellow}dirty${COLORS.reset}` : `${COLORS.green}clean${COLORS.reset}`;
-    return `🌿 ${data.branch} (${dirty}) ${data.changes?.length || 0} changes`;
+    return `${data.branch} (${dirty}) ${data.changes?.length || 0} changes`;
   }
-  if (action === 'log') return `📜 ${data.commits?.length || 0} commits:\n  ${data.commits?.join('\n  ')}`;
-  if (action === 'commit') return data.committed ? `${COLORS.green}✅${COLORS.reset} Committed: ${data.message}` : `⚠️ ${data.reason}`;
-  if (action === 'branch') return data.branches ? `🌿 Branches:\n  ${data.branches.join('\n  ')}` : `✅ ${data.created || data.deleted}`;
-  return `${COLORS.green}✅${COLORS.reset} git ${action}: ${JSON.stringify(data)}`;
+  if (action === 'log') return `${data.commits?.length || 0} commits:\n  ${data.commits?.join('\n  ')}`;
+  if (action === 'commit') return data.committed ? `${COLORS.green}[OK]${COLORS.reset} Committed: ${data.message}` : `[WARN] ${data.reason}`;
+  if (action === 'branch') return data.branches ? `Branches:\n  ${data.branches.join('\n  ')}` : `[OK] ${data.created || data.deleted}`;
+  return `${COLORS.green}[OK]${COLORS.reset} git ${action}: ${JSON.stringify(data)}`;
 }
 
 function formatShellResult(data) {
@@ -65,16 +65,16 @@ function formatShellResult(data) {
 }
 
 function formatSearchResult(action, data) {
-  if (action === 'grep') return `🔍 ${data.matches} matches for "${data.pattern}":\n  ${(data.results || []).join('\n  ')}`;
-  if (action === 'find') return `🔍 ${data.matches} files matching "${data.pattern}":\n  ${(data.files || []).join('\n  ')}`;
-  if (action === 'web') return `🌐 ${data.url} (${data.status}):\n${data.body?.slice(0, 500)}`;
+  if (action === 'grep') return `${data.matches} matches for "${data.pattern}":\n  ${(data.results || []).join('\n  ')}`;
+  if (action === 'find') return `${data.matches} files matching "${data.pattern}":\n  ${(data.files || []).join('\n  ')}`;
+  if (action === 'web') return `${data.url} (${data.status}):\n${data.body?.slice(0, 500)}`;
   return JSON.stringify(data, null, 2);
 }
 
 function formatProjectResult(action, data) {
-  if (action === 'build') return data.success ? `${COLORS.green}✅ Build OK${COLORS.reset} (${data.type})` : `${COLORS.red}❌ Build failed${COLORS.reset} (exit ${data.exitCode})`;
-  if (action === 'test') return data.passed ? `${COLORS.green}✅ Tests passed${COLORS.reset}` : `${COLORS.red}❌ Tests failed${COLORS.reset} (exit ${data.exitCode})`;
-  if (action === 'info') return `📁 ${data.name || data.type}: ${data.scripts?.join(', ') || 'no scripts'}`;
+  if (action === 'build') return data.success ? `${COLORS.green}[OK] Build OK${COLORS.reset} (${data.type})` : `${COLORS.red}[ERR] Build failed${COLORS.reset} (exit ${data.exitCode})`;
+  if (action === 'test') return data.passed ? `${COLORS.green}[OK] Tests passed${COLORS.reset}` : `${COLORS.red}[ERR] Tests failed${COLORS.reset} (exit ${data.exitCode})`;
+  if (action === 'info') return `${data.name || data.type}: ${data.scripts?.join(', ') || 'no scripts'}`;
   return JSON.stringify(data, null, 2);
 }
 

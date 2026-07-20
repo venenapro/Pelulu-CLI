@@ -85,7 +85,7 @@ const ACTIONS = {
       const msg = params.message.replace(/"/g, '\\"');
       const r = await git(`commit -m "${msg}"`, dir);
       if (r.code !== 0 && r.stderr.includes('nothing to commit')) return { committed: false, reason: 'nothing to commit' };
-      log('git', `📝 Committed: ${params.message}`);
+      log('git', `[EDIT] Committed: ${params.message}`);
       return { committed: true, message: params.message, output: r.stdout.slice(-300) };
     },
   },

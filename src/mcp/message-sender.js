@@ -70,7 +70,7 @@ export class MessageSender {
   async _waitForReady() {
     if (this.mqtt.mcp.toolsReceived) return;
 
-    log('info', '⏳ Waiting for MCP handshake...');
+    log('info', '[...] Waiting for MCP handshake...');
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('MCP handshake timeout')), 30000);
       const check = setInterval(() => {

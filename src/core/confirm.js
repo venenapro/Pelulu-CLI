@@ -28,7 +28,7 @@ export async function askConfirmation(toolName, args, check) {
   if (!check.destructive) return true;
 
   const color = check.level === 'danger' ? COLORS.red : COLORS.yellow;
-  const icon = check.level === 'danger' ? '🚨' : '⚠️';
+  const icon = check.level === 'danger' ? '[!]' : '[WARN]';
 
   console.log(`\n${color}${icon} ${check.msg}${COLORS.reset}`);
   console.log(`${COLORS.dim}  Tool: ${toolName}${COLORS.reset}`);
@@ -44,7 +44,7 @@ export async function askConfirmation(toolName, args, check) {
     rl.question(`${color}  Continue? (y/N): ${COLORS.reset}`, (answer) => {
       rl.close();
       const ok = answer.trim().toLowerCase() === 'y';
-      if (!ok) console.log(`${COLORS.red}  ❌ Cancelled${COLORS.reset}\n`);
+      if (!ok) console.log(`${COLORS.red}  [ERR] Cancelled${COLORS.reset}\n`);
       resolve(ok);
     });
   });

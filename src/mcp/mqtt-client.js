@@ -111,9 +111,9 @@ export class MqttClient {
     for (const r of responses) {
       if (r.type === 'mcp') { this._send(r); }
       else if (r.type === 'tool_call') {
-        log('tool', `🔧 ${r.name}`);
+        log('tool', r.name);
         this.mcp.executeTool(r.name, r.args)
-          .then(result => { log('tool', result.isError ? '❌' : '✅'); this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result } }); })
+          .then(result => { log('tool', result.isError ? 'failed' : 'done'); this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result } }); })
           .catch(err => { this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result: { content: [{ type: 'text', text: err.message }], isError: true } } }); });
       }
     }
@@ -124,7 +124,7 @@ export class MqttClient {
   }
 
   _onOther(msg) {
-    if (msg.type === 'stt') { log('user', `🎤 "${msg.text}"`); bus.emit('stt', msg.text); }
+    if (msg.type === 'stt') { log('user', `"${msg.text}"`); bus.emit('stt', msg.text); }
     if (msg.type === 'llm' && msg.text) { bus.emit('llm:text', msg.text); }
     if (msg.type === 'tts' && msg.state === 'sentence_start' && msg.text) { bus.emit('tts:sentence', msg.text); }
     if (msg.type === 'goodbye') { this.sessionId = null; this.mcp.reset(); this._helloQueue = []; }
@@ -138,7 +138,7 @@ export class MqttClient {
 
   sendText(text) {
     this._send({ type: 'listen', state: 'detect', text });
-    log('user', `💬 "${text}"`);
+    log('user', `"${text}"`);
     bus.emit('user:text', text);
   }
 

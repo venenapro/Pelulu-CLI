@@ -25,7 +25,7 @@ function httpGet(url, maxChars = 5000) {
 const ACTIONS = {
   async fetch({ url, method, body, headers }) {
     if (!url) throw new Error('url required');
-    log('network', `🌐 ${method || 'GET'} ${url}`);
+    log('network', `[WEB] ${method || 'GET'} ${url}`);
     const result = await httpGet(url);
     return { url, status: result.status, body: result.body.slice(0, 5000) };
   },

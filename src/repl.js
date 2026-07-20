@@ -121,7 +121,7 @@ export class REPL {
     if (special === 'status') {
       const s = this.session.getStats();
       renderStatus({
-        'MQTT': this.mqtt.connected ? '✅ Connected' : '❌ Disconnected',
+        'MQTT': this.mqtt.connected ? '[OK] Connected' : '[ERR] Disconnected',
         'Session': this.mqtt.sessionId || 'none',
         'Tools': `${this.registry.all().length} (${this.registry.all().reduce((s, t) => s + (t.actions?.length || 0), 0)} actions)`,
         'Turns': s.turns,

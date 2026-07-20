@@ -36,7 +36,7 @@ const ACTIONS = {
       const config = getConfig();
       setNested(config, key, value);
       await saveConfig(config._root, config);
-      log('config', `⚙️ Set ${key} = ${value}`);
+      log('config', `[CFG] Set ${key} = ${value}`);
       return { key, value, saved: true };
     },
   },

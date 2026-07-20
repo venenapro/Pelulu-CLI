@@ -6,14 +6,14 @@ import { COLORS } from './logger.js';
 import { bus } from './event-bus.js';
 
 const THINK_STATES = {
-  idle: { icon: '💤', text: 'Idle' },
-  thinking: { icon: '🤔', text: 'Thinking...' },
-  tool_call: { icon: '🔧', text: 'Using tool...' },
-  reading: { icon: '📖', text: 'Reading file...' },
-  writing: { icon: '✏️', text: 'Writing...' },
-  searching: { icon: '🔍', text: 'Searching...' },
-  building: { icon: '🔨', text: 'Building...' },
-  testing: { icon: '🧪', text: 'Testing...' },
+  idle: { icon: '-', text: 'Idle' },
+  thinking: { icon: '..', text: 'Thinking...' },
+  tool_call: { icon: '>>', text: 'Using tool...' },
+  reading: { icon: '..', text: 'Reading file...' },
+  writing: { icon: '..', text: 'Writing...' },
+  searching: { icon: '..', text: 'Searching...' },
+  building: { icon: '..', text: 'Building...' },
+  testing: { icon: '..', text: 'Testing...' },
 };
 
 export class Thinking {

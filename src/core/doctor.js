@@ -48,10 +48,10 @@ export async function runDoctor() {
   checks.push({ name: 'Git repo', ok: hasGit, value: hasGit ? 'yes' : 'no' });
 
   // Print report
-  console.log(`\n${COLORS.bold}🩺 Doctor Report:${COLORS.reset}\n`);
+  console.log(`\n${COLORS.bold}[DOC] Doctor Report:${COLORS.reset}\n`);
   let allOk = true;
   for (const c of checks) {
-    const icon = c.ok ? `${COLORS.green}✅${COLORS.reset}` : `${COLORS.red}❌${COLORS.reset}`;
+    const icon = c.ok ? `${COLORS.green}[OK]${COLORS.reset}` : `${COLORS.red}[ERR]${COLORS.reset}`;
     console.log(`  ${icon} ${c.name.padEnd(18)} ${c.value}`);
     if (!c.ok) allOk = false;
   }

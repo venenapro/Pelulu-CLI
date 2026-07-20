@@ -76,7 +76,7 @@ export async function handleCommand(cmd, arg, ctx) {
     case '/history': {
       const recent = history.slice(-10);
       if (!recent.length) { log('info', 'No history'); break; }
-      console.log(`\n${COLORS.bold}📜 Recent:${COLORS.reset}\n`);
+      console.log(`\n${COLORS.bold}[LOG] Recent:${COLORS.reset}\n`);
       for (const h of recent) console.log(`  ${COLORS.dim}${new Date(h.ts).toLocaleTimeString()}${COLORS.reset} ${h.text.slice(0, 80)}`);
       console.log();
       break;

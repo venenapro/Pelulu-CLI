@@ -57,7 +57,7 @@ const ACTIONS = {
       const type = await detectProject(dir);
       const cmd = BUILD_CMD[type];
       if (!cmd) throw new Error(`No build for ${type}`);
-      log('project', `🔨 Building (${type})...`);
+      log('project', `[BUILD] Building (${type})...`);
       const r = await run(cmd, dir);
       return { success: r.code === 0, type, exitCode: r.code, output: r.stdout.slice(-500) || r.stderr.slice(-500) };
     },
@@ -70,7 +70,7 @@ const ACTIONS = {
       const type = await detectProject(dir);
       const cmd = TEST_CMD[type];
       if (!cmd) throw new Error(`No test for ${type}`);
-      log('project', `🧪 Testing (${type})...`);
+      log('project', `[TEST] Testing (${type})...`);
       const r = await run(cmd, dir);
       return { passed: r.code === 0, type, exitCode: r.code, output: r.stdout.slice(-1000) || r.stderr.slice(-1000) };
     },

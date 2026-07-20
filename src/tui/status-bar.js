@@ -7,7 +7,7 @@ import chalk from 'chalk';
 export class StatusBar {
   constructor() {
     this.items = {
-      mqtt: '⏳',
+      mqtt: '...',
       session: '-',
       tools: 0,
       calls: 0,
@@ -22,12 +22,12 @@ export class StatusBar {
     const { mqtt, session, tools, calls } = this.items;
     const time = new Date().toLocaleTimeString();
     const line = [
-      chalk.dim('─'.repeat(process.stdout.columns || 60)),
-      chalk.gray(`  ${mqtt === '✅' ? '🟢' : '🔴'} MQTT: ${mqtt}`),
-      chalk.gray(`  📡 Session: ${session}`),
-      chalk.gray(`  🔧 Tools: ${tools}`),
-      chalk.gray(`  📊 Calls: ${calls}`),
-      chalk.gray(`  🕐 ${time}`),
+      chalk.dim('\u2500'.repeat(process.stdout.columns || 60)),
+      chalk.gray(`  ${mqtt === '[OK]' ? '[on]' : '[off]'} MQTT: ${mqtt}`),
+      chalk.gray(`  Session: ${session}`),
+      chalk.gray(`  Tools: ${tools}`),
+      chalk.gray(`  Calls: ${calls}`),
+      chalk.gray(`  ${time}`),
     ].join('  ');
     console.log(line);
   }

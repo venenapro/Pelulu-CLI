@@ -33,11 +33,11 @@ export function renderBanner(config, tools, connected, meta = {}) {
 
   console.log('');
   console.log(chalk.cyan(`${box.tl}${horizontal(w, box.h)}${box.tr}`));
-  console.log(chalk.cyan(`${box.v}`) + chalk.bold.white(center(`🐾 ${config.agent?.name || 'Pelulu CLI'}${version ? ' v' + version : ''}`, w)) + chalk.cyan(`${box.v}`));
+  console.log(chalk.cyan(`${box.v}`) + chalk.bold.white(center(`${config.agent?.name || 'Pelulu CLI'}${version ? ' v' + version : ''}`, w)) + chalk.cyan(`${box.v}`));
   console.log(chalk.cyan(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
-  console.log(chalk.cyan(`${box.v}`) + chalk.gray(pad(`  📁 ${dirName}`, w)) + chalk.cyan(`${box.v}`));
-  console.log(chalk.cyan(`${box.v}`) + chalk.gray(pad(`  🔧 ${tools.length} tools · ${actions} actions`, w)) + chalk.cyan(`${box.v}`));
-  console.log(chalk.cyan(`${box.v}`) + chalk.gray(pad(`  ${connected ? '🟢 MQTT Connected' : '🔴 Disconnected'}  │  Session: ${session}`, w)) + chalk.cyan(`${box.v}`));
+  console.log(chalk.cyan(`${box.v}`) + chalk.gray(pad(`  ${dirName}`, w)) + chalk.cyan(`${box.v}`));
+  console.log(chalk.cyan(`${box.v}`) + chalk.gray(pad(`  ${tools.length} tools / ${actions} actions`, w)) + chalk.cyan(`${box.v}`));
+  console.log(chalk.cyan(`${box.v}`) + chalk.gray(pad(`  ${connected ? 'MQTT: on' : 'MQTT: off'}  |  Session: ${session}`, w)) + chalk.cyan(`${box.v}`));
   console.log(chalk.cyan(`${box.bl}${horizontal(w, box.h)}${box.br}`));
   console.log('');
 }
@@ -46,7 +46,7 @@ export function renderStatus(status) {
   const w = 48;
   console.log('');
   console.log(chalk.cyan(`${box.tl}${horizontal(w, box.h)}${box.tr}`));
-  console.log(chalk.cyan(`${box.v}`) + chalk.bold.white(pad('  📊 Status', w)) + chalk.cyan(`${box.v}`));
+  console.log(chalk.cyan(`${box.v}`) + chalk.bold.white(pad('  [STATS] Status', w)) + chalk.cyan(`${box.v}`));
   console.log(chalk.cyan(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
   for (const [key, value] of Object.entries(status)) {
     console.log(chalk.cyan(`${box.v}`) + chalk.gray(pad(`  ${key}: ${value}`, w)) + chalk.cyan(`${box.v}`));
@@ -57,7 +57,7 @@ export function renderStatus(status) {
 
 export function renderTools(tools) {
   console.log('');
-  console.log(chalk.bold.white('🔧 Available Tools:'));
+  console.log(chalk.bold.white('Available Tools:'));
   console.log('');
   for (const t of tools) {
     const actions = t.actions?.map(a => a.name || a).join(', ') || '';
@@ -77,9 +77,9 @@ export function renderToolCall(name, action, args) {
 
 export function renderToolResult(success, data) {
   if (success) {
-    console.log(chalk.green(`     ✅ OK`));
+    console.log(chalk.green(`     [OK] OK`));
   } else {
-    console.log(chalk.red(`     ❌ ${data || 'error'}`));
+    console.log(chalk.red(`     [ERR] ${data || 'error'}`));
   }
 }
 
@@ -135,7 +135,7 @@ function wrapText(text, maxWidth) {
 
 export function renderUserInput(text) {
   const ts = new Date().toLocaleTimeString();
-  console.log(chalk.dim(`  ${ts} `) + chalk.blue('👤 ') + chalk.white(text));
+  console.log(chalk.dim(`  ${ts} `) + chalk.blue('> ') + chalk.white(text));
 }
 
 export function renderHelp() {
@@ -176,7 +176,7 @@ export function renderUpdateNotification(update) {
 
   console.log('');
   console.log(chalk.yellow(`${box.tl}${horizontal(w, box.h)}${box.tr}`));
-  console.log(chalk.yellow(`${box.v}`) + chalk.bold.yellow(center('  🆕 UPDATE TERSEDIA!', w)) + chalk.yellow(`${box.v}`));
+  console.log(chalk.yellow(`${box.v}`) + chalk.bold.yellow(center('  UPDATE TERSEDIA!', w)) + chalk.yellow(`${box.v}`));
   console.log(chalk.yellow(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
   console.log(chalk.yellow(`${box.v}`) + chalk.white(pad(`  Versi lokal   : ${local}`, w)) + chalk.yellow(`${box.v}`));
   console.log(chalk.yellow(`${box.v}`) + chalk.green(pad(`  Versi terbaru : ${remote}`, w)) + chalk.yellow(`${box.v}`));
@@ -201,7 +201,7 @@ export function renderUpdateNotification(update) {
  * Render update check failure (silent, dim)
  */
 export function renderUpdateError(message) {
-  console.log(chalk.dim(`  ⚠️  Update check failed: ${message}`));
+  console.log(chalk.dim(`  [WARN]  Update check failed: ${message}`));
 }
 
 /**

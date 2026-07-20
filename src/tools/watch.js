@@ -26,7 +26,7 @@ const ACTIONS = {
       const watcher = fsWatch(abs, { recursive: recursive !== false }, (eventType, filename) => {
         if (filter && !filename.includes(filter)) return;
         const event = { type: eventType, file: filename, path: abs, ts: Date.now() };
-        log('watch', `📁 ${eventType}: ${filename}`);
+        log('watch', `[DIR] ${eventType}: ${filename}`);
         bus.emit('file:change', event);
       });
 

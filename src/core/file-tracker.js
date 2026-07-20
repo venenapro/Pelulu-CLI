@@ -32,10 +32,10 @@ export class FileTracker {
     const modified = changes.filter(c => c.action === 'modified');
     const deleted = changes.filter(c => c.action === 'deleted');
 
-    const lines = [`${COLORS.bold}📁 File Changes:${COLORS.reset}`];
-    if (created.length) lines.push(`  ${COLORS.green}✨ Created:${COLORS.reset} ${created.map(c => c.path).join(', ')}`);
-    if (modified.length) lines.push(`  ${COLORS.yellow}📝 Modified:${COLORS.reset} ${modified.map(c => `${c.path} (${c.count}x)`).join(', ')}`);
-    if (deleted.length) lines.push(`  ${COLORS.red}🗑️ Deleted:${COLORS.reset} ${deleted.map(c => c.path).join(', ')}`);
+    const lines = [`${COLORS.bold}[DIR] File Changes:${COLORS.reset}`];
+    if (created.length) lines.push(`  ${COLORS.green}[NEW] Created:${COLORS.reset} ${created.map(c => c.path).join(', ')}`);
+    if (modified.length) lines.push(`  ${COLORS.yellow}[EDIT] Modified:${COLORS.reset} ${modified.map(c => `${c.path} (${c.count}x)`).join(', ')}`);
+    if (deleted.length) lines.push(`  ${COLORS.red}[DEL] Deleted:${COLORS.reset} ${deleted.map(c => c.path).join(', ')}`);
 
     return lines.join('\n');
   }

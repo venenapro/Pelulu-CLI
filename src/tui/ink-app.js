@@ -8,16 +8,29 @@ import {
   StatusBar, MessageBubble, ThinkingIndicator,
 } from './ink-components.js';
 import { CompletableInput } from './completable-input.js';
+import { setInkMode } from '../core/logger.js';
 
 export function createApp({ registry, mqtt, stats, session, bus, config, extras }) {
   return function App() {
     const { exit } = useApp();
     const { isRawModeSupported } = useStdin();
-    const [messages, setMessages] = useState([]);
+    const [messages, setMessages] = useState(() => {
+      // Convert startup buffer logs into initial messages
+      const logs = extras?.startupLogs || [];
+      return logs.map((text, i) => ({
+        id: `init-${i}`, role: 'log', content: text.replace(/\x1b\[[0-9;]*m/g, ''),
+      }));
+    });
     const [thinking, setThinking] = useState('idle');
     const [connected, setConnected] = useState(mqtt.connected);
     const [sessionId, setSessionId] = useState(mqtt.sessionId);
     const maxMessages = 200;
+
+    // ─── Enable Ink mode for logger ──────────────────
+    useEffect(() => {
+      setInkMode(true, bus);
+      return () => setInkMode(false, null);
+    }, []);
 
     // ─── Bus Events ───────────────────────────────────
     useEffect(() => {
@@ -52,11 +65,22 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         setSessionId(null);
       };
 
+      // Log messages rendered inside TUI
+      const onLogMessage = ({ level, msg }) => {
+        const LABELS = { ok: 'OK', err: 'ERR', warn: 'WARN', info: 'i', tool: 'TOOL', mcp: 'MCP', user: 'USER', ai: 'AI' };
+        const label = LABELS[level] || level.toUpperCase();
+        setMessages(prev => [...prev.slice(-maxMessages), {
+          id: `log-${Date.now()}`, role: 'log',
+          content: `[${label}] ${msg}`,
+        }]);
+      };
+
       bus.on('llm:text', onLlmText);
       bus.on('tool:called', onToolCalled);
       bus.on('thinking', onThinking);
       bus.on('ready', onReady);
       bus.on('mqtt:error', onDisconnect);
+      bus.on('log:message', onLogMessage);
 
       return () => {
         bus.off('llm:text', onLlmText);
@@ -64,6 +88,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         bus.off('thinking', onThinking);
         bus.off('ready', onReady);
         bus.off('mqtt:error', onDisconnect);
+        bus.off('log:message', onLogMessage);
       };
     }, []);
 

@@ -26,7 +26,7 @@ const ACTIONS = {
   exec: {
     required: ['command'],
     handler: async ({ command, timeout }) => {
-      log('shell', `⚙️ $ ${command}`);
+      log('shell', `[CFG] $ ${command}`);
       const result = await run(command, timeout);
       const maxLen = getConfig().tools?.max_output || 10000;
       return { stdout: result.stdout.slice(0, maxLen), stderr: result.stderr.slice(0, 2000), exitCode: result.code };
@@ -36,7 +36,7 @@ const ACTIONS = {
   bg: {
     required: ['command'],
     handler: async ({ command }) => {
-      log('shell', `⚙️ [bg] $ ${command}`);
+      log('shell', `[CFG] [bg] $ ${command}`);
       const child = spawn('bash', ['-c', command], { detached: true, stdio: 'ignore' });
       child.unref();
       return { pid: child.pid, background: true, command };

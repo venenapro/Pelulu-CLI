@@ -1,7 +1,10 @@
 /**
  * Logger — colored terminal output with levels
+ * Supports Ink mode: when active, logs go through bus instead of console
  */
 let _debug = false;
+let _inkMode = false;
+let _bus = null;
 
 export const COLORS = {
   reset: '\x1b[0m',
@@ -16,10 +19,16 @@ export const COLORS = {
   gray: '\x1b[90m',
 };
 
+export function setInkMode(enabled, bus) {
+  _inkMode = enabled;
+  _bus = bus;
+}
+export function isInkMode() { return _inkMode; }
+
 const ICONS = {
-  ok: '✅', err: '❌', warn: '⚠️', info: 'ℹ️',
-  tool: '🔧', mcp: '🔗', plugin: '🧩', system: '⚙️',
-  user: '👤', ai: '🤖', debug: '🔍', file: '📁',
+  ok: '[OK]', err: '[ERR]', warn: '[WARN]', info: '[i]',
+  tool: '[TOOL]', mcp: '[MCP]', plugin: '[PLUG]', system: '[SYS]',
+  user: '[USER]', ai: '[AI]', debug: '[DBG]', file: '[FILE]',
 };
 
 export function setDebug(enabled) { _debug = enabled; }
@@ -28,6 +37,13 @@ export function debug(msg, data) { log('debug', msg, data); }
 
 export function log(level, msg, data) {
   if (level === 'debug' && !_debug) return;
+
+  // In Ink mode, route logs through bus so they render inside the TUI
+  if (_inkMode && _bus) {
+    _bus.emit('log:message', { level, msg, data });
+    return;
+  }
+
   const icon = ICONS[level] || '';
   const color = {
     ok: COLORS.green, err: COLORS.red, warn: COLORS.yellow,

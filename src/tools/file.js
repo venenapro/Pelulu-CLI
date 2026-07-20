@@ -40,7 +40,7 @@ const ACTIONS = {
       const abs = safe(path);
       await mkdir(dirname(abs), { recursive: true });
       await writeFile(abs, content, 'utf-8');
-      log('file', `📝 Written: ${abs} (${content.length} chars)`);
+      log('file', `[EDIT] Written: ${abs} (${content.length} chars)`);
       return { path: abs, written: content.length };
     },
   },
@@ -54,7 +54,7 @@ const ACTIONS = {
       const count = content.split(old_text).length - 1;
       content = content.replace(old_text, new_text);
       await writeFile(abs, content, 'utf-8');
-      log('file', `✏️ Edited: ${abs} (${count} occurrence(s))`);
+      log('file', `[EDIT] Edited: ${abs} (${count} occurrence(s))`);
       return { path: abs, edited: true, occurrences: count };
     },
   },
@@ -80,7 +80,7 @@ const ACTIONS = {
       const abs = safe(path);
       if (!existsSync(abs)) throw new Error(`Not found: ${abs}`);
       await unlink(abs);
-      log('file', `🗑️ Deleted: ${abs}`);
+      log('file', `[DEL] Deleted: ${abs}`);
       return { path: abs, deleted: true };
     },
   },
