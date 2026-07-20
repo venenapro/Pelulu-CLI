@@ -45,7 +45,7 @@ export class AgentController {
     // Validate input length
     const MAX_LEN = 70;
     if (userPrompt.length > MAX_LEN) {
-      throw new Error(`Input terlalu panjang (${userPrompt.length}/${MAX_LEN} chars)`);
+      throw new Error(`Input too long (${userPrompt.length}/${MAX_LEN} chars)`);
     }
 
     if (this.#running) {

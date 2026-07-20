@@ -77,13 +77,13 @@ export class AgentLoop {
             bus.emit('agent:progress', {
               iteration: this.#iteration,
               state: 'timeout',
-              message: 'XiaoZhi tidak merespons, coba lagi...',
+              message: 'XiaoZhi not responding, retrying...',
             });
             try {
               response = await this.#waitForResponse();
             } catch (err2) {
               this.#setState(AgentState.FINISHED);
-              return { success: false, result: 'Timeout: XiaoZhi tidak merespons setelah 2 percobaan', iterations: this.#iteration };
+              return { success: false, result: 'Timeout: XiaoZhi did not respond after 2 attempts', iterations: this.#iteration };
             }
           } else {
             throw err;
@@ -208,7 +208,7 @@ export class AgentLoop {
         if (!resolved) {
           resolved = true;
           cleanup();
-          reject(new Error('Timeout: XiaoZhi tidak merespons'));
+          reject(new Error('Timeout: XiaoZhi not responding'));
         }
       }, 60000);
 

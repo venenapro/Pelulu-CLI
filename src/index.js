@@ -67,21 +67,20 @@ async function main() {
     setInkMode(true, bus);
   }
 
-  // 2. Check for updates — auto-install if outdated
+  // 2. Auto-update — silently install latest if outdated
   const update = await checkForUpdates(ROOT);
   if (update.available) {
     const pkgName = await (async () => {
       try { return JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf-8')).name; } catch { return 'pelulu-cli'; }
     })();
-    renderUpdateNotification(update);
     try {
       const { execSync } = await import('child_process');
-      execSync(`npm install -g ${pkgName}@latest`, { stdio: 'inherit' });
+      execSync(`npm install -g ${pkgName}@latest`, { stdio: 'ignore' });
       renderPostUpdate(pkgName, update.remote);
       process.exit(0);
     } catch (e) {
-      console.error(chalk.red(`  ✗ Auto-update gagal: ${e.message}`));
-      console.log(chalk.gray(`  Jalankan manual: npm install -g ${pkgName}@latest`));
+      console.error(chalk.red(`  ✗ Update failed: ${e.message}`));
+      console.log(chalk.gray(`  Run manually: npm install -g ${pkgName}@latest`));
       process.exit(1);
     }
   }

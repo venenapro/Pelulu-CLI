@@ -248,17 +248,17 @@ export function renderPostUpdate(packageName, version) {
   const w = 52;
   console.log('');
   console.log(chalk.green(`${box.tl}${horizontal(w, box.h)}${box.tr}`));
-  console.log(chalk.green(`${box.v}`) + chalk.bold.green(center(`  ✓ ${packageName} v${version} terinstall!`, w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.bold.green(center(`  ✓ ${packageName} v${version} installed!`, w)) + chalk.green(`${box.v}`));
   console.log(chalk.green(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
-  console.log(chalk.green(`${box.v}`) + chalk.white(pad('  Cara menjalankan:', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.white(pad('  Run:', w)) + chalk.green(`${box.v}`));
   console.log(chalk.green(`${box.v}`) + chalk.cyan(pad(`  $ ${packageName}`, w)) + chalk.green(`${box.v}`));
   console.log(chalk.green(`${box.v}`) + chalk.gray(pad('', w)) + chalk.green(`${box.v}`));
-  console.log(chalk.green(`${box.v}`) + chalk.white(pad('  Perintah penting:', w)) + chalk.green(`${box.v}`));
-  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /help    — daftar perintah', w)) + chalk.green(`${box.v}`));
-  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /tools   — lihat tools tersedia', w)) + chalk.green(`${box.v}`));
-  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /status  — status koneksi', w)) + chalk.green(`${box.v}`));
-  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /clear   — bersihkan layar', w)) + chalk.green(`${box.v}`));
-  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /quit    — keluar', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.white(pad('  Commands:', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /help    — show commands', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /tools   — list tools', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /status  — connection status', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /clear   — clear screen', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /quit    — exit', w)) + chalk.green(`${box.v}`));
   console.log(chalk.green(`${box.bl}${horizontal(w, box.h)}${box.br}`));
   console.log('');
 }

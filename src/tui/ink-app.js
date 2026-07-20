@@ -194,7 +194,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
       if (text.length > MAX_INPUT) {
         setMessages(prev => [...prev.slice(-maxMessages), {
           id: `warn-${Date.now()}`, role: 'system', 
-          content: `⚠️ Input terlalu panjang (${text.length}/${MAX_INPUT} chars). Potong pesanmu ya!`,
+          content: `⚠️ Input too long (${text.length}/${MAX_INPUT} chars)`,
         }]);
         return;
       }

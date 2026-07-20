@@ -41,7 +41,7 @@ export class LLMClient {
   async sendPrompt(prompt) {
     if (prompt.length > MAX_PROMPT_LEN) {
       debug('llm', `Prompt too long: ${prompt.length} > ${MAX_PROMPT_LEN}`);
-      throw new Error(`Prompt terlalu panjang (${prompt.length}/${MAX_PROMPT_LEN} chars). Pendekin ya!`);
+      throw new Error(`Prompt too long (${prompt.length}/${MAX_PROMPT_LEN} chars)`);
     }
     await this.#waitForReady();
     debug('llm', `Sending: ${prompt}`);
