@@ -10,6 +10,7 @@
  * - History Condensation
  */
 import { dirname, join } from 'path';
+import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { loadConfig, saveConfig } from './core/config.js';
@@ -33,7 +34,7 @@ import { MessageSender } from './mcp/message-sender.js';
 import { WssEndpoint } from './mcp/wss-endpoint.js';
 import { PluginManager } from './plugins/manager.js';
 import { checkForUpdates } from './core/update-checker.js';
-import { renderUpdateNotification, renderAsciiBanner } from './tui/renderer.js';
+import { renderUpdateNotification, renderPostUpdate, renderAsciiBanner } from './tui/renderer.js';
 import { startInkTUI } from './tui/ink-entry.js';
 
 // Import new agent system
@@ -66,11 +67,23 @@ async function main() {
     setInkMode(true, bus);
   }
 
-  // 2. Check for updates — block if outdated
+  // 2. Check for updates — auto-install if outdated
   const update = await checkForUpdates(ROOT);
   if (update.available) {
+    const pkgName = await (async () => {
+      try { return JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf-8')).name; } catch { return 'pelulu-cli'; }
+    })();
     renderUpdateNotification(update);
-    process.exit(1);
+    try {
+      const { execSync } = await import('child_process');
+      execSync(`npm install -g ${pkgName}@latest`, { stdio: 'inherit' });
+      renderPostUpdate(pkgName, update.remote);
+      process.exit(0);
+    } catch (e) {
+      console.error(chalk.red(`  ✗ Auto-update gagal: ${e.message}`));
+      console.log(chalk.gray(`  Jalankan manual: npm install -g ${pkgName}@latest`));
+      process.exit(1);
+    }
   }
 
   // 3. Workspace & wizard

@@ -236,18 +236,30 @@ export function renderUpdateNotification(update) {
   console.log(chalk.yellow(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
   console.log(chalk.yellow(`${box.v}`) + chalk.white(pad(`  Versi lokal   : ${local}`, w)) + chalk.yellow(`${box.v}`));
   console.log(chalk.yellow(`${box.v}`) + chalk.green(pad(`  Versi terbaru : ${remote}`, w)) + chalk.yellow(`${box.v}`));
-
-  if (release?.name && release.name !== release.tag) {
-    console.log(chalk.yellow(`${box.v}`) + chalk.gray(pad(`  Release       : ${release.name}`, w)) + chalk.yellow(`${box.v}`));
-  }
-  if (release?.url) {
-    console.log(chalk.yellow(`${box.v}`) + chalk.cyan(pad(`  ${release.url}`, w)) + chalk.yellow(`${box.v}`));
-  }
-
-  console.log(chalk.yellow(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
-  console.log(chalk.yellow(`${box.v}`) + chalk.bold.white(pad('  Jalankan perintah berikut untuk update:', w)) + chalk.yellow(`${box.v}`));
-  console.log(chalk.yellow(`${box.v}`) + chalk.green(pad('  npm install pelulu-cli@latest', w)) + chalk.yellow(`${box.v}`));
+  console.log(chalk.yellow(`${box.v}`) + chalk.gray(pad('  Menginstall update secara otomatis...', w)) + chalk.yellow(`${box.v}`));
   console.log(chalk.yellow(`${box.bl}${horizontal(w, box.h)}${box.br}`));
+  console.log('');
+}
+
+/**
+ * Render usage info after successful update
+ */
+export function renderPostUpdate(packageName, version) {
+  const w = 52;
+  console.log('');
+  console.log(chalk.green(`${box.tl}${horizontal(w, box.h)}${box.tr}`));
+  console.log(chalk.green(`${box.v}`) + chalk.bold.green(center(`  ✓ ${packageName} v${version} terinstall!`, w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
+  console.log(chalk.green(`${box.v}`) + chalk.white(pad('  Cara menjalankan:', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.cyan(pad(`  $ ${packageName}`, w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.white(pad('  Perintah penting:', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /help    — daftar perintah', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /tools   — lihat tools tersedia', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /status  — status koneksi', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /clear   — bersihkan layar', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.v}`) + chalk.gray(pad('  /quit    — keluar', w)) + chalk.green(`${box.v}`));
+  console.log(chalk.green(`${box.bl}${horizontal(w, box.h)}${box.br}`));
   console.log('');
 }
 
