@@ -25,18 +25,28 @@ readPkgVersion();
 
 // ─── Status Bar ───────────────────────────────────────────
 export function StatusBar({ connected, session }) {
-  const version = _pkgVersion || '0.0.0';
+  const statusDot = connected ? '●' : '○';
+  const statusColor = connected ? 'green' : 'red';
+  const sess = session ? session.slice(0, 8) : '---';
+
   return React.createElement(Box, {
-    borderStyle: 'single', borderColor: 'cyan', width: '100%', paddingX: 0,
+    width: '100%', paddingX: 1, paddingY: 0,
+    flexDirection: 'row', justifyContent: 'space-between',
   },
-    React.createElement(Text, { color: 'cyan', bold: true }, ` pelulu-cli v${version} `),
-    React.createElement(Text, { dimColor: true }, '| '),
-    React.createElement(Text, { color: connected ? 'green' : 'red', bold: connected },
-      connected ? 'ONLINE' : 'OFFLINE'
+    // Left: name + status
+    React.createElement(Box, { flexDirection: 'row' },
+      React.createElement(Text, { color: 'cyan', bold: true }, '🐱 PELULU '),
+      React.createElement(Text, { color: statusColor }, statusDot),
+      React.createElement(Text, { color: statusColor, bold: connected },
+        connected ? ' online' : ' offline'
+      ),
     ),
-    React.createElement(Text, { dimColor: true }, ' | '),
-    React.createElement(Text, { dimColor: true }, session ? session.slice(0, 8) : '-'),
-    React.createElement(Text, { dimColor: true }, ' | Provider: Xiaozhi.me'),
+    // Right: session + provider
+    React.createElement(Box, { flexDirection: 'row' },
+      React.createElement(Text, { dimColor: true }, `session:${sess}`),
+      React.createElement(Text, { dimColor: true }, '  '),
+      React.createElement(Text, { dimColor: true }, 'xiaozhi.me'),
+    ),
   );
 }
 

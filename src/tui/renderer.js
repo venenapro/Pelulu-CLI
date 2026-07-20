@@ -54,35 +54,29 @@ export async function renderAsciiBanner() {
   const version = await getVersion();
   const w = 52;
 
-  const cat = [
-    '   /\\_/\\  ',
-    '  ( o.o ) ',
-    '   > ^ <  ',
-    '  /|   |\\ ',
-    ' (_|   |_)',
-  ];
-
-  const info = [
-    chalk.cyan.bold('P E L U L U - C L I'),
-    chalk.gray(`v${version}`),
-    chalk.cyan('coding companion'),
-    chalk.gray('powered by XiaoZhi'),
-    '',
-  ];
-
   console.log('');
   console.log(chalk.cyan(`${box.tl}${horizontal(w, box.h)}${box.tr}`));
 
-  for (let i = 0; i < Math.max(cat.length, info.length); i++) {
-    const left = cat[i] ? chalk.cyan(cat[i]) : ' '.repeat(11);
-    const right = info[i] || '';
-    const gap = '    ';
-    console.log(chalk.cyan(`${box.v}`) + left + gap + right + ' '.repeat(Math.max(0, w - 11 - gap.length - stripAnsi(right).length)) + chalk.cyan(`${box.v}`));
+  // ASCII art — cute coding cat
+  const art = [
+    chalk.cyan('  /\\_/\\  ') + chalk.cyanBright('  ____        _ _'),
+    chalk.cyan('  ( o.o ) ') + chalk.cyanBright('  |  _ \ _   _| | |_   _'),
+    chalk.cyan('   > ^ <  ') + chalk.cyanBright('  | |_) | | | | | | | | |'),
+    chalk.cyan('  /|   |\\ ') + chalk.cyanBright('  |  __/| |_| | | | |_| |'),
+    chalk.cyan(' (_|   |_)') + chalk.cyanBright('  |_|    \__,_|_|_|\__, |'),
+    chalk.cyan('           ') + chalk.cyanBright('                |___/ '),
+  ];
+
+  for (const line of art) {
+    console.log(chalk.cyan(`${box.v}`) + line + ' '.repeat(Math.max(0, w - stripAnsi(line).length + 1)) + chalk.cyan(`${box.v}`));
   }
 
   console.log(chalk.cyan(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
 
-  const features = chalk.gray('  18 tools  •  MCP protocol  •  agent mode');
+  const tagline = chalk.cyanBright.bold('  🐱 coding companion') + chalk.gray(`  v${version}`);
+  const features = chalk.gray('  18 tools  •  MCP protocol  •  agent mode  •  xiaozhi.me');
+
+  console.log(chalk.cyan(`${box.v}`) + tagline + ' '.repeat(Math.max(0, w - stripAnsi(tagline).length)) + chalk.cyan(`${box.v}`));
   console.log(chalk.cyan(`${box.v}`) + features + ' '.repeat(Math.max(0, w - stripAnsi(features).length)) + chalk.cyan(`${box.v}`));
 
   console.log(chalk.cyan(`${box.bl}${horizontal(w, box.h)}${box.br}`));
