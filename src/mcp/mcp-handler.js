@@ -43,7 +43,7 @@ export class McpHandler {
           result: {
             protocolVersion: PROTOCOL_VERSION,
             capabilities: { tools: {} },
-            serverInfo: { name: 'coding-agent', version: '1.0.0' },
+            serverInfo: { name: 'shellulu', version: '1.0.0' },
           },
         },
       });
@@ -61,7 +61,7 @@ export class McpHandler {
       const tools = (this.#toolsFn?.() || []).map(t => {
         const safeName = this._sanitize(t.name);
         this.#nameMap.set(safeName, t.name);
-        return { name: safeName, description: t.description, inputSchema: t.inputSchema || { type: 'object', properties: {} } };
+        return this._optimizeTool({ name: safeName, description: t.description, inputSchema: t.inputSchema || { type: 'object', properties: {} } });
       });
       responses.push({ type: 'mcp', payload: { jsonrpc: '2.0', id: p.id, result: { tools } } });
       log('mcp', `Sent ${tools.length} tools`);
@@ -88,5 +88,28 @@ export class McpHandler {
 
   _sanitize(name) {
     return String(name).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  }
+
+  /**
+   * Optimize tool definition to stay under 8KB MQTT broker limit
+   * - Remove descriptions from inputSchema properties
+   * - Remove enum values (keep as plain string)
+   * - Truncate long descriptions
+   */
+  _optimizeTool(tool) {
+    const optimized = {
+      name: tool.name,
+      description: tool.description?.slice(0, 60) || '',
+      inputSchema: { type: 'object', properties: {} }
+    };
+
+    // Optimize properties - remove descriptions and enums
+    if (tool.inputSchema?.properties) {
+      for (const [key, val] of Object.entries(tool.inputSchema.properties)) {
+        optimized.inputSchema.properties[key] = { type: val.type };
+      }
+    }
+
+    return optimized;
   }
 }

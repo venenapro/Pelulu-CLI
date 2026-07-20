@@ -50,10 +50,11 @@ export class MqttClient {
         clientId: this.mqttCfg.client_id,
         username: this.mqttCfg.username,
         password: this.mqttCfg.password,
-        keepalive: 240,
+        keepalive: 60,
         reconnectPeriod: 5000,
         connectTimeout: 10000,
         clean: true,
+        protocolVersion: 4, // MQTT v3.1.1
       });
 
       this.client.on('connect', () => {
