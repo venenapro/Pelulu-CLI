@@ -1,11 +1,11 @@
 /**
- * Update Checker — compare local version with GitHub releases
- * Uses: https://api.github.com/repos/venenapro/Pelulu-CLI/releases
+ * Update Checker — compare local version with npm registry
+ * Uses: https://registry.npmjs.org/PACKAGE_NAME/latest
  */
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
-const GITHUB_RELEASES_URL = 'https://api.github.com/repos/venenapro/Pelulu-CLI/releases';
+const NPM_REGISTRY_URL = 'https://registry.npmjs.org';
 const TIMEOUT_MS = 8000;
 
 /**
@@ -43,36 +43,41 @@ async function getLocalVersion(root) {
 }
 
 /**
- * Fetch latest release from GitHub API.
- * Returns { tag, name, body, url, publishedAt } or null on failure.
+ * Read package name from package.json
  */
-async function fetchLatestRelease() {
+async function getPackageName(root) {
+  try {
+    const raw = await readFile(join(root, 'package.json'), 'utf-8');
+    const pkg = JSON.parse(raw);
+    return pkg.name || 'pelulu-cli';
+  } catch {
+    return 'pelulu-cli';
+  }
+}
+
+/**
+ * Fetch latest version from npm registry.
+ * Returns { version, url } or null on failure.
+ */
+async function fetchLatestFromNpm(packageName) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const res = await fetch(GITHUB_RELEASES_URL, {
+    const res = await fetch(`${NPM_REGISTRY_URL}/${packageName}/latest`, {
       signal: controller.signal,
-      headers: {
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'Pelulu-CLI',
-      },
+      headers: { 'Accept': 'application/json' },
     });
 
     if (!res.ok) return null;
 
-    const releases = await res.json();
-    if (!Array.isArray(releases) || releases.length === 0) return null;
-
-    // Filter out prerelease/draft, pick latest stable
-    const stable = releases.find(r => !r.prerelease && !r.draft) || releases[0];
+    const data = await res.json();
+    const version = data.version;
+    if (!version) return null;
 
     return {
-      tag: stable.tag_name || '',
-      name: stable.name || stable.tag_name || '',
-      body: stable.body || '',
-      url: stable.html_url || '',
-      publishedAt: stable.published_at || '',
+      version,
+      url: `https://www.npmjs.com/package/${packageName}`,
     };
   } catch {
     return null;
@@ -82,9 +87,9 @@ async function fetchLatestRelease() {
 }
 
 /**
- * Check for updates.
+ * Check for updates (from npm registry).
  * Returns:
- *   { available: true, local, remote, release }  — update available
+ *   { available: true, local, remote, npm_url }  — update available
  *   { available: false, local, remote }           — up to date
  *   { available: false, error: true, message }    — check failed
  */
@@ -94,16 +99,17 @@ export async function checkForUpdates(root) {
     return { available: false, error: true, message: 'Could not read local version from package.json' };
   }
 
-  const release = await fetchLatestRelease();
-  if (!release) {
-    return { available: false, error: true, local: localVersion, message: 'Could not fetch GitHub releases' };
+  const packageName = await getPackageName(root);
+  const npm = await fetchLatestFromNpm(packageName);
+  if (!npm) {
+    return { available: false, error: true, local: localVersion, message: 'Could not fetch npm registry' };
   }
 
   const localParsed = parseSemver(localVersion);
-  const remoteParsed = parseSemver(release.tag);
+  const remoteParsed = parseSemver(npm.version);
 
   if (!localParsed || !remoteParsed) {
-    return { available: false, error: true, local: localVersion, remote: release.tag, message: 'Invalid version format' };
+    return { available: false, error: true, local: localVersion, remote: npm.version, message: 'Invalid version format' };
   }
 
   const cmp = compareSemver(remoteParsed, localParsed);
@@ -112,14 +118,14 @@ export async function checkForUpdates(root) {
     return {
       available: true,
       local: localVersion,
-      remote: release.tag.replace(/^v/i, ''),
-      release,
+      remote: npm.version,
+      release: { url: npm.url },
     };
   }
 
   return {
     available: false,
     local: localVersion,
-    remote: release.tag.replace(/^v/i, ''),
+    remote: npm.version,
   };
 }
