@@ -13,7 +13,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { loadConfig, saveConfig } from './core/config.js';
-import { log, setDebug, initFileLog, flushLogs, getLogFile } from './core/logger.js';
+import { log, setDebug, initFileLog, flushLogs, getLogFile, writeRawToLog } from './core/logger.js';
 import { bus } from './core/event-bus.js';
 import { ToolRegistry } from './core/tool-registry.js';
 import { Sandbox } from './core/sandbox.js';
@@ -56,8 +56,9 @@ async function main() {
   // 1. Load config
   const config = await loadConfig(ROOT);
 
-  // 1b. Initialize file logging
-  const logFile = await initFileLog(ROOT);
+  // 1b. Initialize file logging (deletes old logs, keeps only latest)
+  const appName = config.agent?.name?.toLowerCase().replace(/\s+/g, '-') || 'pelulu';
+  const logFile = await initFileLog(ROOT, appName);
   log('info', `Log file: ${logFile}`);
 
   // 2. Check for updates — block if outdated
@@ -197,9 +198,18 @@ async function main() {
     wss.start();
   }
 
-  // 12. Track conversation
-  bus.on('user:text', (text) => session.addUserMessage(text));
-  bus.on('llm:text', (text) => session.addAiMessage(text));
+  // 12. Track conversation + log AI responses
+  bus.on('user:text', (text) => {
+    session.addUserMessage(text);
+    writeRawToLog(`[USER] ${text}`);
+  });
+  bus.on('llm:text', (text) => {
+    session.addAiMessage(text);
+    writeRawToLog(`[AI] ${text}`);
+  });
+  bus.on('tts:sentence', (text) => {
+    writeRawToLog(`[AI-TTS] ${text}`);
+  });
 
   // 13. Save config
   await saveConfig(ROOT, config);

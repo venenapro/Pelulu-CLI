@@ -92,21 +92,29 @@ export class McpHandler {
 
   /**
    * Optimize tool definition to stay under 8KB MQTT broker limit
-   * - Remove descriptions from inputSchema properties
-   * - Remove enum values (keep as plain string)
-   * - Truncate long descriptions
+   * - Keep descriptions (truncated to 200 chars)
+   * - Keep enum values (critical for XiaoZhi to know valid actions)
+   * - Keep required fields (critical for XiaoZhi to know what's mandatory)
    */
   _optimizeTool(tool) {
     const optimized = {
       name: tool.name,
-      description: tool.description?.slice(0, 60) || '',
+      description: tool.description?.slice(0, 200) || '',
       inputSchema: { type: 'object', properties: {} }
     };
 
-    // Optimize properties - remove descriptions and enums
+    // Keep required array
+    if (tool.inputSchema?.required) {
+      optimized.inputSchema.required = tool.inputSchema.required;
+    }
+
+    // Optimize properties — keep enum + short description
     if (tool.inputSchema?.properties) {
       for (const [key, val] of Object.entries(tool.inputSchema.properties)) {
-        optimized.inputSchema.properties[key] = { type: val.type };
+        const prop = { type: val.type };
+        if (val.enum) prop.enum = val.enum;
+        if (val.description) prop.description = val.description.slice(0, 80);
+        optimized.inputSchema.properties[key] = prop;
       }
     }
 

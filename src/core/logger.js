@@ -2,7 +2,7 @@
  * Logger — colored terminal output with levels + file logging
  * Supports Ink mode: when active, logs go through bus instead of console
  */
-import { writeFile, mkdir, appendFile } from 'fs/promises';
+import { writeFile, mkdir, appendFile, readdir, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
@@ -45,18 +45,30 @@ export function debug(msg, data) { log('debug', msg, data); }
 
 /**
  * Initialize file logging
+ * Deletes old logs, keeps only the latest one
  */
-export async function initFileLog(root) {
+export async function initFileLog(root, appName = 'pelulu') {
   const logDir = join(root, 'logs');
   await mkdir(logDir, { recursive: true });
+
+  // Delete old log files
+  try {
+    const files = await readdir(logDir);
+    for (const f of files) {
+      if (f.endsWith('.log')) {
+        await unlink(join(logDir, f)).catch(() => {});
+      }
+    }
+  } catch {}
+
   const now = new Date();
   const date = now.toISOString().slice(0, 10);
   const time = now.toISOString().slice(11, 19).replace(/:/g, '-');
-  _logFile = join(logDir, `pelulu-${date}_${time}.log`);
+  _logFile = join(logDir, `${appName}-${date}_${time}.log`);
   
   // Write header
   const header = `═══════════════════════════════════════\n` +
-    `Pelulu-CLI Log\n` +
+    `${appName} Log\n` +
     `Started: ${now.toISOString()}\n` +
     `═══════════════════════════════════════\n\n`;
   await writeFile(_logFile, header, 'utf-8');
@@ -76,18 +88,29 @@ function writeToFile(level, msg, data) {
   line += '\n';
   
   _logQueue.push(line);
-  
-  // Flush every 500ms
-  if (!_logTimer) {
-    _logTimer = setTimeout(async () => {
-      const batch = _logQueue.join('');
-      _logQueue = [];
-      _logTimer = null;
-      try {
-        await appendFile(_logFile, batch, 'utf-8');
-      } catch {}
-    }, 500);
-  }
+  _flushSoon();
+}
+
+/**
+ * Write raw text to log file (for AI responses, chat messages)
+ */
+export function writeRawToLog(text) {
+  if (!_logFile || !text) return;
+  const ts = new Date().toISOString().slice(11, 23);
+  _logQueue.push(`${ts} ${text}\n`);
+  _flushSoon();
+}
+
+function _flushSoon() {
+  if (_logTimer) return;
+  _logTimer = setTimeout(async () => {
+    const batch = _logQueue.join('');
+    _logQueue = [];
+    _logTimer = null;
+    try {
+      await appendFile(_logFile, batch, 'utf-8');
+    } catch {}
+  }, 500);
 }
 
 export function log(level, msg, data) {

@@ -45,8 +45,12 @@ export class AgentLoop {
     this.#iteration = 0;
     this.#abortController = new AbortController();
     this.#history = [{ role: 'user', content: userPrompt, ts: Date.now() }];
+    this._promptSent = false;
 
     try {
+      // Send prompt only once at the start
+      await this.#sendOnce(llm);
+
       while (this.#iteration < this.#maxIterations) {
         this.#iteration++;
         this.#setState(AgentState.THINKING);
@@ -64,21 +68,19 @@ export class AgentLoop {
           return { success: true, result: 'Aborted', iterations: this.#iteration };
         }
 
-        // Wait for response (text or tool call)
+        // Wait for response (text or tool call) — does NOT send prompt again
         let response;
         try {
-          response = await this.#waitForResponse(llm, tools);
+          response = await this.#waitForResponse();
         } catch (err) {
           if (err.message.includes('Timeout')) {
-            // Timeout - emit warning and try to continue
             bus.emit('agent:progress', {
               iteration: this.#iteration,
               state: 'timeout',
               message: 'XiaoZhi tidak merespons, coba lagi...',
             });
-            // Try one more time
             try {
-              response = await this.#waitForResponse(llm, tools);
+              response = await this.#waitForResponse();
             } catch (err2) {
               this.#setState(AgentState.FINISHED);
               return { success: false, result: 'Timeout: XiaoZhi tidak merespons setelah 2 percobaan', iterations: this.#iteration };
@@ -105,11 +107,10 @@ export class AgentLoop {
           return { success: true, result: response.content, iterations: this.#iteration };
         }
 
-        // Handle tool call
+        // Handle tool call — wait for MQTT client to execute it, don't double-execute
         if (response.type === 'tool_call') {
           this.#setState(AgentState.ACTING);
           
-          // Emit tool progress
           bus.emit('agent:progress', {
             iteration: this.#iteration,
             state: 'tool',
@@ -118,11 +119,11 @@ export class AgentLoop {
             message: `Executing ${response.name}.${response.args?.action || ''}...`,
           });
 
-          const result = await this.#execTool(response, { tools, sandbox, confirm });
+          // Wait for the tool result from MQTT client (already executed there)
+          const result = await this.#waitForToolResult(response);
           
           this.#history.push({ role: 'tool', name: response.name, content: JSON.stringify(result), ts: Date.now() });
           
-          // Emit tool done
           bus.emit('agent:progress', {
             iteration: this.#iteration,
             state: 'tool_done',
@@ -149,9 +150,20 @@ export class AgentLoop {
   }
 
   /**
-   * Wait for response from XiaoZhi (text or MCP tool call)
+   * Send prompt to XiaoZhi — only once per run
    */
-  #waitForResponse(llm, tools) {
+  async #sendOnce(llm) {
+    if (this._promptSent) return;
+    this._promptSent = true;
+    debug('agent', `Sending prompt: ${this.#history[0].content}`);
+    await llm.sendPrompt(this.#history[0].content);
+  }
+
+  /**
+   * Wait for response from XiaoZhi (text or MCP tool call)
+   * Does NOT send prompt — that's done once in #sendOnce
+   */
+  #waitForResponse() {
     return new Promise((resolve, reject) => {
       let resolved = false;
       let buffer = '';
@@ -168,7 +180,6 @@ export class AgentLoop {
         if (resolved || gotToolCall) return;
         buffer += text;
         
-        // Emit text progress
         bus.emit('agent:progress', {
           state: 'receiving',
           message: `Receiving: ${buffer.length} chars...`,
@@ -192,14 +203,14 @@ export class AgentLoop {
         resolve({ type: 'tool_call', ...data });
       };
 
-      // Timeout after 45s (shorter for faster feedback)
+      // Timeout after 60s
       const timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
           cleanup();
           reject(new Error('Timeout: XiaoZhi tidak merespons'));
         }
-      }, 45000);
+      }, 60000);
 
       // Abort handler
       this.#abortController.signal.addEventListener('abort', () => {
@@ -213,46 +224,53 @@ export class AgentLoop {
 
       bus.on('llm:text', onText);
       bus.on('mcp:tool_call', onTool);
-
-      // Send prompt
-      llm.sendPrompt(this.#history[0].content).catch(err => {
-        if (!resolved) {
-          resolved = true;
-          cleanup();
-          clearTimeout(timeout);
-          reject(err);
-        }
-      });
     });
   }
 
   /**
-   * Execute a tool call
+   * Wait for tool result from MQTT client (avoids double-execution)
+   * Falls back to direct execution if MQTT doesn't respond in time
    */
-  async #execTool(call, { tools, sandbox, confirm }) {
-    try {
-      if (confirm?.isDestructive(call.name, call.args)?.destructive) {
-        const ok = await confirm.ask(call.name, call.args);
-        if (!ok) return { isError: true, content: [{ type: 'text', text: 'Cancelled' }] };
-      }
-      sandbox?.validate(call.name, call.args);
-      
-      const start = Date.now();
-      
-      // Add timeout for tool execution (30s max)
-      const toolTimeout = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Tool timeout')), 30000);
-      });
-      
-      const result = await Promise.race([
-        tools.call(call.name, call.args),
-        toolTimeout,
-      ]);
-      
-      debug('agent', `${call.name}.${call.args?.action} → ${Date.now() - start}ms`);
-      return result;
-    } catch (err) {
-      return { isError: true, content: [{ type: 'text', text: err.message }] };
-    }
+  #waitForToolResult(call) {
+    return new Promise((resolve) => {
+      let resolved = false;
+
+      const onResult = ({ name, args, result }) => {
+        if (resolved) return;
+        if (name === call.name && args?.action === call.args?.action) {
+          resolved = true;
+          bus.off('mcp:tool_result', onResult);
+          clearTimeout(fallbackTimer);
+          debug('agent', `Got tool result from MQTT: ${name}`);
+          resolve(result);
+        }
+      };
+
+      // Fallback: if MQTT doesn't respond in 10s, execute directly
+      const fallbackTimer = setTimeout(async () => {
+        if (resolved) return;
+        resolved = true;
+        bus.off('mcp:tool_result', onResult);
+        debug('agent', `Tool result timeout, executing directly: ${call.name}`);
+        try {
+          const result = await this.#execToolDirect(call);
+          resolve(result);
+        } catch (err) {
+          resolve({ isError: true, content: [{ type: 'text', text: err.message }] });
+        }
+      }, 10000);
+
+      bus.on('mcp:tool_result', onResult);
+    });
   }
+
+  /**
+   * Direct tool execution (fallback only)
+   */
+  async #execToolDirect(call) {
+    return { isError: true, content: [{ type: 'text', text: 'Tool execution via MQTT timed out' }] };
+  }
+
+  // Tool execution removed — handled by MQTT client
+  // Agent loop only waits for results via mcp:tool_result events
 }

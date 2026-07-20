@@ -80,7 +80,23 @@ async function startFallbackREPL({ registry, mqtt, stats, session, bus, extras }
       }
     } catch {}
 
-    mqtt.sendText(text);
+    // Use agent controller if available, otherwise send directly
+    const agentController = extras?.agentController;
+    if (agentController) {
+      try {
+        const result = await agentController.run(text, { generatePlan: false });
+        if (result.success && result.result) {
+          const clean = result.result.replace(/\p{Emoji_Presentation}/gu, '').replace(/\p{Extended_Pictographic}/gu, '').trim();
+          if (clean) console.log(chalk.white(`  ${clean}`));
+        } else if (!result.success) {
+          console.log(chalk.red(`  Error: ${result.result}`));
+        }
+      } catch (err) {
+        console.log(chalk.red(`  Error: ${err.message}`));
+      }
+    } else {
+      mqtt.sendText(text);
+    }
     rl.prompt();
   });
 
