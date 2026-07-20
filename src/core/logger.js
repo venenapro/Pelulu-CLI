@@ -1,10 +1,18 @@
 /**
- * Logger — colored terminal output with levels
+ * Logger — colored terminal output with levels + file logging
  * Supports Ink mode: when active, logs go through bus instead of console
  */
+import { writeFile, mkdir, appendFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { homedir } from 'os';
+
 let _debug = false;
 let _inkMode = false;
 let _bus = null;
+let _logFile = null;
+let _logQueue = [];
+let _logTimer = null;
 
 export const COLORS = {
   reset: '\x1b[0m',
@@ -35,8 +43,58 @@ export function setDebug(enabled) { _debug = enabled; }
 export function isDebug() { return _debug; }
 export function debug(msg, data) { log('debug', msg, data); }
 
+/**
+ * Initialize file logging
+ */
+export async function initFileLog(root) {
+  const logDir = join(root, 'logs');
+  await mkdir(logDir, { recursive: true });
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toISOString().slice(11, 19).replace(/:/g, '-');
+  _logFile = join(logDir, `pelulu-${date}_${time}.log`);
+  
+  // Write header
+  const header = `═══════════════════════════════════════\n` +
+    `Pelulu-CLI Log\n` +
+    `Started: ${now.toISOString()}\n` +
+    `═══════════════════════════════════════\n\n`;
+  await writeFile(_logFile, header, 'utf-8');
+  return _logFile;
+}
+
+/**
+ * Write log entry to file
+ */
+function writeToFile(level, msg, data) {
+  if (!_logFile) return;
+  
+  const ts = new Date().toISOString().slice(11, 23);
+  const icon = ICONS[level] || '';
+  let line = `${ts} ${icon} ${msg}`;
+  if (data && _debug) line += ` ${JSON.stringify(data)}`;
+  line += '\n';
+  
+  _logQueue.push(line);
+  
+  // Flush every 500ms
+  if (!_logTimer) {
+    _logTimer = setTimeout(async () => {
+      const batch = _logQueue.join('');
+      _logQueue = [];
+      _logTimer = null;
+      try {
+        await appendFile(_logFile, batch, 'utf-8');
+      } catch {}
+    }, 500);
+  }
+}
+
 export function log(level, msg, data) {
   if (level === 'debug' && !_debug) return;
+
+  // Write to file
+  writeToFile(level, msg, data);
 
   // In Ink mode, route logs through bus so they render inside the TUI
   if (_inkMode && _bus) {
@@ -54,6 +112,30 @@ export function log(level, msg, data) {
   const prefix = `${color}${icon} ${COLORS.reset}`;
   console.log(`${prefix}${msg}`);
   if (data && _debug) console.log(`${COLORS.gray}${JSON.stringify(data, null, 2)}${COLORS.reset}`);
+}
+
+/**
+ * Flush pending logs to file
+ */
+export async function flushLogs() {
+  if (_logTimer) {
+    clearTimeout(_logTimer);
+    _logTimer = null;
+  }
+  if (_logQueue.length > 0 && _logFile) {
+    const batch = _logQueue.join('');
+    _logQueue = [];
+    try {
+      await appendFile(_logFile, batch, 'utf-8');
+    } catch {}
+  }
+}
+
+/**
+ * Get log file path
+ */
+export function getLogFile() {
+  return _logFile;
 }
 
 export function table(rows) {

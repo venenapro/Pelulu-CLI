@@ -13,7 +13,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { loadConfig, saveConfig } from './core/config.js';
-import { log, setDebug } from './core/logger.js';
+import { log, setDebug, initFileLog, flushLogs, getLogFile } from './core/logger.js';
 import { bus } from './core/event-bus.js';
 import { ToolRegistry } from './core/tool-registry.js';
 import { Sandbox } from './core/sandbox.js';
@@ -55,6 +55,10 @@ async function main() {
 
   // 1. Load config
   const config = await loadConfig(ROOT);
+
+  // 1b. Initialize file logging
+  const logFile = await initFileLog(ROOT);
+  log('info', `Log file: ${logFile}`);
 
   // 2. Check for updates — block if outdated
   const update = await checkForUpdates(ROOT);
@@ -147,6 +151,7 @@ async function main() {
     startupLogs.push(chalk.green('  ✓ Agent system initialized'));
     startupLogs.push(chalk.gray(`    - Max iterations: ${config.agent?.max_iterations || 50}`));
     startupLogs.push(chalk.gray(`    - Max input: 70 chars`));
+    startupLogs.push(chalk.gray(`    - Log: ${getLogFile()}`));
   }
 
   // 10. Register MCP tool handler (for XiaoZhi direct tool calls)
@@ -215,6 +220,7 @@ async function main() {
     if (wss) wss.stop();
     await registry.shutdown();
     mqtt.disconnect();
+    await flushLogs();
     process.exit(0);
   };
   process.on('SIGINT', shutdown);
