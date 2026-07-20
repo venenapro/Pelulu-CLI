@@ -116,6 +116,23 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         }, 500);
       };
 
+      // Agent progress events
+      const onAgentProgress = ({ state, message, tool, action }) => {
+        if (state === 'tool') {
+          setThinking('tool_call');
+          setLogLine(`[TOOL] ${tool}.${action || ''}...`);
+        } else if (state === 'tool_done') {
+          setThinking('thinking');
+          setLogLine(`[TOOL] done, waiting...`);
+        } else if (state === 'receiving') {
+          setLogLine(`[LLM] ${message}`);
+        } else if (state === 'thinking') {
+          setThinking('thinking');
+        } else if (state === 'timeout') {
+          setLogLine(`[WARN] ${message}`);
+        }
+      };
+
       bus.on('llm:text', onLlmText);
       bus.on('tts:sentence', onTtsSentence);
       bus.on('tool:called', onToolCalled);
@@ -123,6 +140,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
       bus.on('ready', onReady);
       bus.on('mqtt:error', onDisconnect);
       bus.on('log:message', onLogMessage);
+      bus.on('agent:progress', onAgentProgress);
 
       return () => {
         bus.off('llm:text', onLlmText);
@@ -132,6 +150,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         bus.off('ready', onReady);
         bus.off('mqtt:error', onDisconnect);
         bus.off('log:message', onLogMessage);
+        bus.off('agent:progress', onAgentProgress);
         if (ttsTimer) clearTimeout(ttsTimer);
       };
     }, []);
