@@ -75,8 +75,8 @@ async function main() {
     await runWizard(ROOT);
   }
 
-  // Show ASCII banner only in non-TTY mode (fallback REPL)
-  // In TTY mode (Ink TUI), the StatusBar handles branding
+  // Banner is now a React component inside Ink TUI (AsciiBanner)
+  // Only render console banner for fallback REPL (non-TTY)
   if (!process.stdin.isTTY) {
     await renderAsciiBanner();
   }

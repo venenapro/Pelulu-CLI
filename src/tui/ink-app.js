@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import {
-  StatusBar, MessageBubble, ThinkingIndicator, stripEmojis,
+  AsciiBanner, StatusBar, MessageBubble, ThinkingIndicator, stripEmojis,
 } from './ink-components.js';
 import { CompletableInput } from './completable-input.js';
 import { setInkMode } from '../core/logger.js';
@@ -342,7 +342,10 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     return React.createElement(Box, {
       flexDirection: 'column', width: '100%',
     },
-      // Top: Status bar
+      // Top: Banner + Status bar
+      React.createElement(AsciiBanner, {
+        version: config?.agent?.version,
+      }),
       React.createElement(StatusBar, {
         connected, session: sessionId,
       }),
