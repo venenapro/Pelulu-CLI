@@ -243,9 +243,31 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         }
       } catch {}
 
-      // Send to XiaoZhi
+      // Send to XiaoZhi via Agent Controller (if available) or direct
       setThinking('thinking');
-      mqtt.sendText(text);
+      
+      const agentController = extras?.agentController;
+      if (agentController) {
+        // Use agent controller for proper response handling
+        try {
+          const result = await agentController.run(text, { generatePlan: false });
+          setThinking('idle');
+          
+          if (result.success && result.result) {
+            setMessages(prev => [...prev.slice(-maxMessages), {
+              id: `assistant-${Date.now()}`, role: 'assistant', content: result.result,
+            }]);
+          }
+        } catch (err) {
+          setThinking('idle');
+          setMessages(prev => [...prev.slice(-maxMessages), {
+            id: `error-${Date.now()}`, role: 'system', content: `Error: ${err.message}`,
+          }]);
+        }
+      } else {
+        // Fallback: send directly to XiaoZhi
+        mqtt.sendText(text);
+      }
     }, [registry, mqtt, stats, session]);
 
     // ─── Render ───────────────────────────────────────
