@@ -13,7 +13,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import { loadConfig, saveConfig } from './core/config.js';
-import { log, setDebug, setInkMode, initFileLog, flushLogs, getLogFile, writeRawToLog } from './core/logger.js';
+import { log, setDebug, debug, setInkMode, initFileLog, flushLogs, getLogFile, writeRawToLog } from './core/logger.js';
 import { bus } from './core/event-bus.js';
 import { ToolRegistry } from './core/tool-registry.js';
 import { Sandbox } from './core/sandbox.js';
