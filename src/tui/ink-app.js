@@ -40,6 +40,9 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     useEffect(() => {
       const onLlmText = (text) => {
         setThinking('idle');
+        // Strip emojis to check if there's real content
+        const clean = text.replace(/\p{Emoji_Presentation}/gu, '').replace(/\p{Extended_Pictographic}/gu, '').trim();
+        if (!clean) return; // skip emoji-only LLM responses (TTS will carry the real text)
         setMessages(prev => [...prev.slice(-maxMessages), {
           id: Date.now().toString(), role: 'assistant', content: text,
         }]);
@@ -79,7 +82,28 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         logTimer.current = setTimeout(() => setLogLine(''), 4000);
       };
 
+      // XiaoZhi sends responses as TTS sentences, not LLM text
+      // Accumulate TTS sentences and display as assistant message
+      let ttsBuffer = '';
+      let ttsTimer = null;
+
+      const onTtsSentence = (text) => {
+        ttsBuffer += text;
+        setThinking('idle');
+        // Debounce: wait for all TTS sentences to arrive, then display
+        if (ttsTimer) clearTimeout(ttsTimer);
+        ttsTimer = setTimeout(() => {
+          if (ttsBuffer) {
+            setMessages(prev => [...prev.slice(-maxMessages), {
+              id: Date.now().toString(), role: 'assistant', content: ttsBuffer,
+            }]);
+            ttsBuffer = '';
+          }
+        }, 500);
+      };
+
       bus.on('llm:text', onLlmText);
+      bus.on('tts:sentence', onTtsSentence);
       bus.on('tool:called', onToolCalled);
       bus.on('thinking', onThinking);
       bus.on('ready', onReady);
@@ -88,11 +112,13 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
 
       return () => {
         bus.off('llm:text', onLlmText);
+        bus.off('tts:sentence', onTtsSentence);
         bus.off('tool:called', onToolCalled);
         bus.off('thinking', onThinking);
         bus.off('ready', onReady);
         bus.off('mqtt:error', onDisconnect);
         bus.off('log:message', onLogMessage);
+        if (ttsTimer) clearTimeout(ttsTimer);
       };
     }, []);
 
