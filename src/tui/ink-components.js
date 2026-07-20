@@ -26,37 +26,18 @@ readPkgVersion();
 // ─── ASCII Banner ────────────────────────────────────────
 export function AsciiBanner({ version }) {
   const v = version || '0.0.0';
-
-  const cat = [
-    '  /\\_/\\  ',
-    ' ( o.o ) ',
-    '  > ^ <  ',
-    ' /|   |\\ ',
-    ' (_|   |_)',
-  ];
-  const info = [
-    { text: 'P E L U L U - C L I', color: 'cyan', bold: true },
-    { text: `v${v}`, color: 'gray' },
-    { text: 'coding companion', color: 'cyanBright' },
-    { text: 'powered by XiaoZhi', color: 'gray' },
-    null,
-  ];
+  const banner =
+    `  /\_/\     PELULU-CLI\n` +
+    ` ( o.o )   v${v}\n` +
+    `  > ^ <    coding companion\n` +
+    ` /|   |\   powered by XiaoZhi\n` +
+    ` (_|   |_)\n` +
+    `            18 tools • MCP protocol • agent mode`;
 
   return React.createElement(Box, {
-    flexDirection: 'column', width: '100%',
-    paddingY: 0, paddingLeft: 1,
+    paddingLeft: 1, paddingY: 0,
   },
-    ...cat.map((line, i) =>
-      React.createElement(Box, { key: i },
-        React.createElement(Text, { color: 'cyan' }, line),
-        info[i]
-          ? React.createElement(Text, { color: info[i].color, bold: info[i].bold }, '  ' + info[i].text)
-          : null,
-      )
-    ),
-    React.createElement(Box, null,
-      React.createElement(Text, { dimColor: true }, '            18 tools  •  MCP protocol  •  agent mode'),
-    ),
+    React.createElement(Text, { color: 'cyan' }, banner),
   );
 }
 
