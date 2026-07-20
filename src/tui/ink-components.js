@@ -5,13 +5,31 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useStdin } from 'ink';
 import TextInput from 'ink-text-input';
+import { readFile } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, '..', '..');
+
+let _pkgVersion = null;
+async function readPkgVersion() {
+  if (_pkgVersion) return _pkgVersion;
+  try {
+    const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf-8'));
+    _pkgVersion = pkg.version || '0.0.0';
+  } catch { _pkgVersion = '0.0.0'; }
+  return _pkgVersion;
+}
+readPkgVersion();
 
 // ─── Status Bar ───────────────────────────────────────────
-export function StatusBar({ connected, session, version }) {
+export function StatusBar({ connected, session }) {
+  const version = _pkgVersion || '0.0.0';
   return React.createElement(Box, {
     borderStyle: 'single', borderColor: 'cyan', width: '100%', paddingX: 0,
   },
-    React.createElement(Text, { color: 'cyan', bold: true }, ` pelulu-cli v.${version || '0.0.0'} `),
+    React.createElement(Text, { color: 'cyan', bold: true }, ` pelulu-cli v${version} `),
     React.createElement(Text, { dimColor: true }, '| '),
     React.createElement(Text, { color: connected ? 'green' : 'red', bold: connected },
       connected ? 'ONLINE' : 'OFFLINE'

@@ -75,8 +75,8 @@ async function main() {
     await runWizard(ROOT);
   }
 
-  // Show ASCII banner before Ink takes over
-  renderAsciiBanner(config.agent?.version);
+  // Show ASCII banner before Ink takes over (reads version from package.json)
+  await renderAsciiBanner();
 
   // Redirect console.log to buffer — everything after this goes into Ink
   console.log = bufferLog;

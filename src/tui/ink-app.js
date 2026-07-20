@@ -345,7 +345,6 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
       // Top: Status bar
       React.createElement(StatusBar, {
         connected, session: sessionId,
-        version: config?.agent?.version,
       }),
 
       // Log status line (single line, auto-updating, auto-hiding)

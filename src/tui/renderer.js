@@ -3,7 +3,12 @@
  * Like Claude Code / Gemini CLI / OpenCode
  */
 import chalk from 'chalk';
-import { createInterface } from 'readline';
+import { readFile } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, '..', '..');
 
 const box = {
   tl: '╭', tr: '╮', bl: '╰', br: '╯',
@@ -24,19 +29,63 @@ function center(text, width) {
 }
 
 /**
+ * Read version from package.json (cached)
+ */
+let _cachedVersion = null;
+async function getVersion() {
+  if (_cachedVersion) return _cachedVersion;
+  try {
+    const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf-8'));
+    _cachedVersion = pkg.version || '0.0.0';
+  } catch {
+    _cachedVersion = '0.0.0';
+  }
+  return _cachedVersion;
+}
+
+function stripAnsi(str) {
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+/**
  * Render the Pelulu ASCII art banner (displayed once at startup)
  */
-export function renderAsciiBanner(version) {
-  const v = version ? `v.${version}` : '';
-  const lines = [
-    chalk.cyan('  /\\_/\\  '),
-    chalk.cyan(' ( o.o ) ') + chalk.bold.cyan(` P E L U L U - C L I`),
-    chalk.cyan('  > ^ <  ') + chalk.gray(` ${v}  |  powered by XiaoZhi`),
-    chalk.cyan(' /|   |\\ '),
-    chalk.cyan('(_|   |_)') + chalk.dim('  the tiny coding companion'),
+export async function renderAsciiBanner() {
+  const version = await getVersion();
+  const w = 52;
+
+  const cat = [
+    '   /\\_/\\  ',
+    '  ( o.o ) ',
+    '   > ^ <  ',
+    '  /|   |\\ ',
+    ' (_|   |_)',
   ];
+
+  const info = [
+    chalk.cyan.bold('P E L U L U - C L I'),
+    chalk.gray(`v${version}`),
+    chalk.cyan('coding companion'),
+    chalk.gray('powered by XiaoZhi'),
+    '',
+  ];
+
   console.log('');
-  for (const line of lines) console.log(line);
+  console.log(chalk.cyan(`${box.tl}${horizontal(w, box.h)}${box.tr}`));
+
+  for (let i = 0; i < Math.max(cat.length, info.length); i++) {
+    const left = cat[i] ? chalk.cyan(cat[i]) : ' '.repeat(11);
+    const right = info[i] || '';
+    const gap = '    ';
+    console.log(chalk.cyan(`${box.v}`) + left + gap + right + ' '.repeat(Math.max(0, w - 11 - gap.length - stripAnsi(right).length)) + chalk.cyan(`${box.v}`));
+  }
+
+  console.log(chalk.cyan(`${box.ml}${horizontal(w, box.h)}${box.mr}`));
+
+  const features = chalk.gray('  18 tools  •  MCP protocol  •  agent mode');
+  console.log(chalk.cyan(`${box.v}`) + features + ' '.repeat(Math.max(0, w - stripAnsi(features).length)) + chalk.cyan(`${box.v}`));
+
+  console.log(chalk.cyan(`${box.bl}${horizontal(w, box.h)}${box.br}`));
   console.log('');
 }
 
@@ -100,12 +149,7 @@ export function renderToolResult(success, data) {
   }
 }
 
-/**
- * Strip emoji and decorative unicode from text.
- * Keeps ASCII, CJK, common punctuation.
- */
 function stripEmojis(text) {
-  // Remove emoji (Unicode ranges), box-drawing decorative symbols, and common decorative chars
   return text
     .replace(/\p{Emoji_Presentation}/gu, '')
     .replace(/\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?/gu, '')
@@ -122,7 +166,6 @@ export function renderAiResponse(text) {
   const clean = stripEmojis(text);
   if (!clean) return;
   console.log('');
-  // Wrap long lines at 80 chars
   const lines = wrapText(clean, 80);
   for (const line of lines) {
     console.log(chalk.white(`  ${line}`));
@@ -183,10 +226,6 @@ export function createPrompt(dirName) {
   return chalk.cyan(`${dirName} `) + chalk.white('❯ ');
 }
 
-/**
- * Render update notification banner
- * @param {object} update - { local, remote, release: { tag, name, url, body } }
- */
 export function renderUpdateNotification(update) {
   const w = 56;
   const { local, remote, release } = update;
@@ -201,7 +240,6 @@ export function renderUpdateNotification(update) {
   if (release?.name && release.name !== release.tag) {
     console.log(chalk.yellow(`${box.v}`) + chalk.gray(pad(`  Release       : ${release.name}`, w)) + chalk.yellow(`${box.v}`));
   }
-
   if (release?.url) {
     console.log(chalk.yellow(`${box.v}`) + chalk.cyan(pad(`  ${release.url}`, w)) + chalk.yellow(`${box.v}`));
   }
@@ -213,24 +251,15 @@ export function renderUpdateNotification(update) {
   console.log('');
 }
 
-/**
- * Render update check failure (silent, dim)
- */
 export function renderUpdateError(message) {
   console.log(chalk.dim(`  [WARN]  Update check failed: ${message}`));
 }
 
-/**
- * Render a clean init status line (replaces verbose per-tool logging)
- */
 export function renderInitLine(icon, text, detail = '') {
   const detailStr = detail ? chalk.dim(` (${detail})`) : '';
   console.log(chalk.gray(`  ${icon} ${text}`) + detailStr);
 }
 
-/**
- * Render ready line with session info
- */
 export function renderReady(sessionId) {
   console.log(chalk.green(`  ✓ Ready`) + chalk.dim(`  session: ${sessionId || '-'}`));
   console.log('');
