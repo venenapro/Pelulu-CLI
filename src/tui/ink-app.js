@@ -30,10 +30,9 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     const scrollOffsetRef = useRef(0);
 
     // Calculate how many rows are available for messages
+    const MAX_VISIBLE_MESSAGES = 12;
     const getAvailableRows = useCallback(() => {
-      const termRows = process.stdout.rows || 24;
-      // status bar (3) + log line (1) + input box (3) + padding (2) + thinking (1) = ~10
-      return Math.max(5, termRows - 10);
+      return MAX_VISIBLE_MESSAGES;
     }, []);
 
     // ─── Enable Ink mode for logger ──────────────────
