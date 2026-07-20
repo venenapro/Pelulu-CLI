@@ -173,6 +173,7 @@ export class AgentLoop {
       let resolved = false;
       let responseBuffer = '';
       let responseTimer = null;
+      let toolCallReceived = false;
 
       const cleanup = () => {
         if (responseTimer) clearTimeout(responseTimer);
@@ -182,13 +183,15 @@ export class AgentLoop {
 
       const finalizeAsText = () => {
         if (resolved) return;
+        // If we received a tool call, don't finalize as text
+        if (toolCallReceived) return;
         resolved = true;
         cleanup();
         resolve({ type: 'text', content: responseBuffer.trim() });
       };
 
       const onText = (text) => {
-        if (resolved) return;
+        if (resolved || toolCallReceived) return;
         responseBuffer += text;
         
         // Reset timer - if no new text for 2 seconds, consider response complete
@@ -198,6 +201,7 @@ export class AgentLoop {
 
       const onToolCall = (data) => {
         if (resolved) return;
+        toolCallReceived = true;
         resolved = true;
         cleanup();
         resolve({ type: 'tool_call', ...data });

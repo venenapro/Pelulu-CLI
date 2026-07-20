@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Android Automation dengan uiautomator2
-Pastikan uiautomator2 sudah terinstall: pip install uiautomator2
+Android Automation menggunakan uiautomator2
+Dibuat untuk otomatisasi perangkat Android
 """
 
 import uiautomator2 as u2
@@ -11,7 +12,7 @@ class AndroidAutomation:
     def __init__(self, device_id=None):
         """
         Inisialisasi koneksi ke perangkat Android
-        device_id: opsional, jika None akan menggunakan perangkat pertama yang terdeteksi
+        device_id: ID perangkat (opsional), jika None akan menggunakan perangkat pertama yang terdeteksi
         """
         if device_id:
             self.d = u2.connect(device_id)
@@ -20,72 +21,94 @@ class AndroidAutomation:
         print(f"Terhubung ke perangkat: {self.d.device_info}")
     
     def tap_element(self, text=None, resource_id=None, description=None):
-        """Tap elemen berdasarkan text, resource_id, atau description"""
+        """
+        Menekan elemen berdasarkan teks, resource_id, atau deskripsi
+        """
         if text:
             self.d(text=text).click()
-            print(f"Men-tap elemen dengan text: {text}")
+            print(f"Menekan elemen dengan teks: {text}")
         elif resource_id:
             self.d(resourceId=resource_id).click()
-            print(f"Men-tap elemen dengan resource_id: {resource_id}")
+            print(f"Menekan elemen dengan resource_id: {resource_id}")
         elif description:
             self.d(description=description).click()
-            print(f"Men-tap elemen dengan description: {description}")
+            print(f"Menekan elemen dengan deskripsi: {description}")
     
     def input_text(self, text, input_text):
-        """Input text ke elemen"""
+        """
+        Memasukkan teks ke dalam elemen input
+        """
         self.d(text=text).set_text(input_text)
-        print(f"Menginput '{input_text}' ke elemen dengan text: {text}")
+        print(f"Memasukkan teks: {input_text}")
     
-    def wait_element(self, text=None, timeout=10):
-        """Tunggu elemen muncul"""
-        if text:
-            self.d(text=text).wait(timeout=timeout)
-            print(f"Menunggu elemen dengan text: {text}")
+    def scroll_to_element(self, text):
+        """
+        Scroll sampai menemukan elemen dengan teks tertentu
+        """
+        self.d(text=text).scroll.to()
+        print(f"Scroll ke elemen: {text}")
     
-    def swipe_screen(self, direction='up'):
-        """Swipe layar"""
-        if direction == 'up':
-            self.d.swipe(0.5, 0.8, 0.5, 0.2)
-        elif direction == 'down':
-            self.d.swipe(0.5, 0.2, 0.5, 0.8)
-        elif direction == 'left':
-            self.d.swipe(0.8, 0.5, 0.2, 0.5)
-        elif direction == 'right':
-            self.d.swipe(0.2, 0.5, 0.8, 0.5)
-        print(f"Swipe layar ke arah: {direction}")
+    def wait_for_element(self, text, timeout=10):
+        """
+        Menunggu elemen muncul
+        """
+        self.d.wait_activity(text, timeout)
+        print(f"Menunggu elemen: {text}")
     
-    def press_key(self, key_code):
-        """Tekan tombol (home, back, enter, dll)"""
-        self.d.press(key_code)
-        print(f"Menekan tombol: {key_code}")
+    def swipe(self, start_x, start_y, end_x, end_y, duration=0.5):
+        """
+        Melakukan gesture swipe
+        """
+        self.d.swipe(start_x, start_y, end_x, end_y, duration)
+        print(f"Swipe dari ({start_x}, {start_y}) ke ({end_x}, {end_y})")
     
-    def screenshot(self, filename="screenshot.png"):
-        """Ambil screenshot"""
+    def press_back(self):
+        """
+        Menekan tombol back
+        """
+        self.d.press("back")
+        print("Menekan tombol back")
+    
+    def press_home(self):
+        """
+        Menekan tombol home
+        """
+        self.d.press("home")
+        print("Menekan tombol home")
+    
+    def get_screenshot(self, filename="screenshot.png"):
+        """
+        Mengambil screenshot
+        """
         self.d.screenshot(filename)
         print(f"Screenshot disimpan: {filename}")
     
-    def get_current_activity(self):
-        """Dapatkan activity saat ini"""
-        activity = self.d.current_activity()
-        print(f"Activity saat ini: {activity}")
-        return activity
-
+    def launch_app(self, package_name):
+        """
+        Membuka aplikasi berdasarkan package name
+        """
+        self.d.app_start(package_name)
+        print(f"Membuka aplikasi: {package_name}")
+    
+    def close_app(self, package_name):
+        """
+        Menutup aplikasi
+        """
+        self.d.app_stop(package_name)
+        print(f"Menutup aplikasi: {package_name}")
 
 # Contoh penggunaan
 if __name__ == "__main__":
-    # Inisialisasi otomatisasi
+    # Buat instance otomatisasi
     automation = AndroidAutomation()
     
-    # Contoh: tap elemen dengan text tertentu
-    # automation.tap_element(text="Settings")
+    # Contoh: Buka aplikasi
+    # automation.launch_app("com.example.app")
     
-    # Contoh: input text
-    # automation.input_text(text="Search", input_text="uiautomator2")
+    # Contoh: Tekan elemen
+    # automation.tap_element(text="Login")
     
-    # Contoh: swipe layar
-    # automation.swipe_screen(direction='up')
+    # Contoh: Input teks
+    # automation.input_text("Username", "user123")
     
-    # Contoh: tekan tombol back
-    # automation.press_key('back')
-    
-    print("Otomatisasi selesai!")
+    print("Otomatisasi siap digunakan!")
