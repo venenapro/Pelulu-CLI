@@ -1,5 +1,5 @@
 /**
- * CompletableInput — TextInput with Tab auto-completion
+ * CompletableInput — TextInput with Tab auto-completion + char counter
  * Wraps ink-text-input and adds completion support
  */
 import React, { useState, useCallback } from 'react';
@@ -7,47 +7,51 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { getCompletions } from '../core/completion.js';
 
+const MAX_CHARS = 70;
+
 export function CompletableInput({ onSubmit, placeholder }) {
   const [value, setValue] = useState('');
   const [completions, setCompletions] = useState([]);
   const [completionIndex, setCompletionIndex] = useState(0);
   const [showCompletions, setShowCompletions] = useState(false);
 
+  const isAtLimit = value.length >= MAX_CHARS;
+  const charCount = value.length;
+  const remaining = MAX_CHARS - charCount;
+
   // Handle Tab for completion
   useInput((input, key) => {
     if (key.tab) {
       if (!showCompletions) {
-        // First Tab: show completions
         const hits = getCompletions(value);
         if (hits.length > 0) {
           setCompletions(hits);
           setCompletionIndex(0);
           setShowCompletions(true);
-          // Auto-fill first match
           if (hits.length === 1) {
-            setValue(hits[0] + ' ');
+            // Only auto-fill if within limit
+            const filled = hits[0] + ' ';
+            if (filled.length <= MAX_CHARS) {
+              setValue(filled);
+            }
             setShowCompletions(false);
           } else {
-            setValue(hits[0]);
+            setValue(hits[0].slice(0, MAX_CHARS));
           }
         }
       } else {
-        // Subsequent Tab: cycle through completions
         const next = (completionIndex + 1) % completions.length;
         setCompletionIndex(next);
-        setValue(completions[next]);
+        setValue(completions[next].slice(0, MAX_CHARS));
       }
     } else if (key.escape) {
-      // Escape: hide completions
       setShowCompletions(false);
       setCompletions([]);
       setCompletionIndex(0);
     } else if (key.return) {
-      // Enter: handled by TextInput onSubmit, do nothing here
       setShowCompletions(false);
       setCompletions([]);
     } else {
-      // Any other key: reset completions
       if (showCompletions) {
         setShowCompletions(false);
         setCompletions([]);
@@ -56,13 +60,15 @@ export function CompletableInput({ onSubmit, placeholder }) {
     }
   });
 
-  // Update value from TextInput (but not on Tab/Enter which are handled above)
+  // Update value from TextInput
   const handleChange = useCallback((val) => {
-    setValue(val);
-    // Live completion hints
-    if (val.length > 0) {
-      const hits = getCompletions(val);
-      if (hits.length > 0 && hits[0] !== val) {
+    // Enforce max chars
+    const trimmed = val.slice(0, MAX_CHARS);
+    setValue(trimmed);
+
+    if (trimmed.length > 0) {
+      const hits = getCompletions(trimmed);
+      if (hits.length > 0 && hits[0] !== trimmed) {
         setCompletions(hits);
         setShowCompletions(true);
         setCompletionIndex(0);
@@ -74,7 +80,7 @@ export function CompletableInput({ onSubmit, placeholder }) {
     }
   }, []);
 
-  // Handle TextInput submit (Enter key)
+  // Handle TextInput submit
   const handleSubmit = useCallback((val) => {
     const trimmed = val.trim();
     if (trimmed) {
@@ -84,6 +90,9 @@ export function CompletableInput({ onSubmit, placeholder }) {
     setShowCompletions(false);
     setCompletions([]);
   }, [onSubmit]);
+
+  // Color for char counter
+  const counterColor = isAtLimit ? 'red' : remaining <= 10 ? 'yellow' : 'dim';
 
   return React.createElement(Box, { flexDirection: 'column', width: '100%' },
     // Completion suggestions
@@ -105,23 +114,24 @@ export function CompletableInput({ onSubmit, placeholder }) {
       )
       : null,
 
-    // Input line
-    React.createElement(Box, { paddingX: 1 },
+    // Input line with char counter
+    React.createElement(Box, { paddingX: 1, flexDirection: 'row', alignItems: 'center' },
       React.createElement(Text, { color: 'cyan' }, '> '),
-      React.createElement(TextInput, {
-        value,
-        onChange: handleChange,
-        onSubmit: handleSubmit,
-        placeholder: placeholder || 'type a message...',
-        // Don't show cursor when we have a completion suggestion
-        showCursor: !showCompletions || completions.length <= 1,
-      }),
-      // Show ghost completion (the remaining part of the suggested completion)
-      showCompletions && completions.length > 0 && value.length > 0
-        ? React.createElement(Text, { dimColor: true },
-            completions[completionIndex]?.slice(value.length) || ''
-          )
-        : null,
+      React.createElement(Box, { flexDirection: 'column', flexGrow: 1 },
+        React.createElement(TextInput, {
+          value,
+          onChange: handleChange,
+          onSubmit: handleSubmit,
+          placeholder: isAtLimit ? '⚠️ limit reached!' : (placeholder || 'type a message...'),
+          showCursor: !showCompletions || completions.length <= 1,
+        }),
+      ),
+      // Char counter
+      React.createElement(Box, { marginLeft: 1 },
+        React.createElement(Text, { color: counterColor },
+          isAtLimit ? `🚫 ${MAX_CHARS}/${MAX_CHARS}` : `${charCount}/${MAX_CHARS}`
+        ),
+      ),
     ),
   );
 }
