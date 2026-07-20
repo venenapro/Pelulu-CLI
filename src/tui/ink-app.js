@@ -342,10 +342,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     return React.createElement(Box, {
       flexDirection: 'column', width: '100%',
     },
-      // Top: Banner + Status bar
-      React.createElement(AsciiBanner, {
-        version: config?.agent?.version,
-      }),
+      // Top: Status bar (banner removed — Ink re-render duplication bug)
       React.createElement(StatusBar, {
         connected, session: sessionId,
       }),
