@@ -23,7 +23,7 @@ export function StatusBar({ connected, session, version }) {
 }
 
 // ─── Strip Emojis ─────────────────────────────────────────
-function stripEmojis(text) {
+export function stripEmojis(text) {
   return text
     .replace(/\p{Emoji_Presentation}/gu, '')
     .replace(/\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?/gu, '')

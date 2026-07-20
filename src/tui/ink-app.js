@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import {
-  StatusBar, MessageBubble, ThinkingIndicator,
+  StatusBar, MessageBubble, ThinkingIndicator, stripEmojis,
 } from './ink-components.js';
 import { CompletableInput } from './completable-input.js';
 import { setInkMode } from '../core/logger.js';
@@ -252,13 +252,34 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     const tools = registry.all();
     const actions = tools.reduce((s, t) => s + (t.actions?.length || 0), 0);
 
-    // Calculate visible messages (scrollable window)
-    const availableRows = getAvailableRows();
+    // Calculate visible messages (scrollable window, max 12 rendered lines)
+    const MAX_RENDER_LINES = 12;
     const totalMessages = messages.length;
     const endIdx = totalMessages - scrollOffset;
-    const startIdx = Math.max(0, endIdx - availableRows);
+
+    // Count lines backwards from endIdx to fit within MAX_RENDER_LINES
+    let usedLines = 0;
+    let startIdx = endIdx;
+    for (let i = endIdx - 1; i >= 0; i--) {
+      const msg = messages[i];
+      let msgLines = 1;
+      if (msg.role === 'assistant' && msg.content) {
+        const w = (process.stdout.columns || 80) - 6;
+        const words = stripEmojis(msg.content).split(/\s+/);
+        let lineLen = 0;
+        msgLines = 1;
+        for (const word of words) {
+          if (lineLen + word.length + 1 > w && lineLen > 0) { msgLines++; lineLen = word.length; }
+          else { lineLen += word.length + (lineLen > 0 ? 1 : 0); }
+        }
+      }
+      if (usedLines + msgLines > MAX_RENDER_LINES) break;
+      usedLines += msgLines;
+      startIdx = i;
+    }
+
     const visibleMessages = messages.slice(startIdx, endIdx);
-    const canScrollUp = scrollOffset < totalMessages - 1;
+    const canScrollUp = startIdx > 0;
     const canScrollDown = scrollOffset > 0;
 
     return React.createElement(Box, {
