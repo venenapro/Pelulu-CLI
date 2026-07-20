@@ -39,6 +39,11 @@ if (args.includes('--debug')) setDebug(true);
 const LIST_TOOLS = args.includes('--list-tools');
 
 async function main() {
+  // Buffer ALL startup logs for Ink to display inside TUI
+  const startupLogs = [];
+  const origLog = console.log;
+  const bufferLog = (...args) => startupLogs.push(args.join(' '));
+
   // 1. Load config
   const config = await loadConfig(ROOT);
 
@@ -56,6 +61,9 @@ async function main() {
     await runWizard(ROOT);
   }
 
+  // Redirect console.log to buffer — everything after this goes into Ink
+  console.log = bufferLog;
+
   // 4. Load tools
   const registry = new ToolRegistry();
   const pluginMgr = new PluginManager(registry);
@@ -67,6 +75,7 @@ async function main() {
   const actions = registry.all().reduce((s, t) => s + (t.actions?.length || 0), 0);
 
   if (LIST_TOOLS) {
+    console.log = origLog;
     const tools = registry.list();
     console.log('\nTools:\n');
     for (const t of tools) console.log(`  ${t.name} — ${t.description} (${t.actions.join(', ')})`);
@@ -88,20 +97,13 @@ async function main() {
   // 7. Connect to XiaoZhi
   const mqtt = new MqttClient(config);
 
-  // Buffer startup log messages for Ink to display
-  const startupLogs = [];
-  const origLog = console.log;
-  const bufferLog = (...args) => startupLogs.push(args.join(' '));
-
   bus.on('activation:required', ({ code }) => {
-    origLog('');
-    origLog(`  Kode Aktivasi: ${code}`);
-    origLog(`  https://xiaozhi.me`);
-    origLog('');
+    startupLogs.push('');
+    startupLogs.push(`  Kode Aktivasi: ${code}`);
+    startupLogs.push(`  https://xiaozhi.me`);
+    startupLogs.push('');
   });
 
-  // Temporarily redirect console.log to buffer during MQTT connect
-  console.log = bufferLog;
   try {
     await withRetry(() => mqtt.connect(), { maxRetries: 2, delay: 2000 });
   } catch (e) {
@@ -109,7 +111,6 @@ async function main() {
     console.error(chalk.red(`\n  Connection failed: ${e.message}\n`));
     process.exit(1);
   }
-  console.log = origLog;
 
   // 8. Message sender
   const sender = new MessageSender(mqtt);
