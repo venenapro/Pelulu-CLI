@@ -26,18 +26,18 @@ readPkgVersion();
 // ─── ASCII Banner ────────────────────────────────────────
 export function AsciiBanner({ version }) {
   const v = version || '0.0.0';
-  const banner =
-    '  /\\_/\\      PELULU-CLI\n' +
-    ' ( o.o )    v' + v + '\n' +
-    '  > ^ <     coding companion\n' +
-    ' /|   |\\    powered by XiaoZhi\n' +
-    '(_|   |_)\n' +
-    '             18 tools \u2022 MCP protocol \u2022 agent mode';
-
   return React.createElement(Box, {
-    paddingLeft: 1, paddingY: 0,
+    flexDirection: 'column', paddingLeft: 1, paddingY: 0,
   },
-    React.createElement(Text, { color: 'cyan' }, banner),
+    React.createElement(Box, null,
+      React.createElement(Text, { color: 'cyan' }, '  /\\_/\\      '),
+      React.createElement(Text, { color: 'cyan', bold: true }, 'PELULU-CLI'),
+    ),
+    React.createElement(Text, { color: 'cyan' }, ' ( o.o )    v' + v),
+    React.createElement(Text, { color: 'cyan' }, '  > ^ <     the tiny coding agent'),
+    React.createElement(Text, { color: 'cyan' }, ' /|   |\\    powered by XiaoZhi'),
+    React.createElement(Text, { color: 'cyan' }, '(_|   |_)'),
+    React.createElement(Text, { dimColor: true }, '             18 tools • MCP protocol • agent mode'),
   );
 }
 
