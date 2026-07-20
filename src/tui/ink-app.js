@@ -14,22 +14,26 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
   return function App() {
     const { exit } = useApp();
     const { isRawModeSupported } = useStdin();
-    const [messages, setMessages] = useState(() => {
-      // Convert startup buffer logs into initial messages
-      const logs = extras?.startupLogs || [];
-      return logs.map((text, i) => ({
-        id: `init-${i}`, role: 'log', content: text.replace(/\x1b\[[0-9;]*m/g, ''),
-      }));
-    });
+    const [messages, setMessages] = useState([]);
     const [thinking, setThinking] = useState('idle');
     const [connected, setConnected] = useState(mqtt.connected);
     const [sessionId, setSessionId] = useState(mqtt.sessionId);
+    // Show last startup log as initial log line
+    const _startupLogs = extras?.startupLogs || [];
+    const _lastStartup = _startupLogs.length
+      ? _startupLogs[_startupLogs.length - 1].replace(/\x1b\[[0-9;]*m/g, '')
+      : '';
+    const [logLine, setLogLine] = useState(_lastStartup);
+    const logTimer = useRef(null);
     const maxMessages = 200;
 
     // ─── Enable Ink mode for logger ──────────────────
     useEffect(() => {
       setInkMode(true, bus);
-      return () => setInkMode(false, null);
+      return () => {
+        setInkMode(false, null);
+        if (logTimer.current) clearTimeout(logTimer.current);
+      };
     }, []);
 
     // ─── Bus Events ───────────────────────────────────
@@ -65,14 +69,14 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         setSessionId(null);
       };
 
-      // Log messages rendered inside TUI
+      // Single log line that updates in place
       const onLogMessage = ({ level, msg }) => {
         const LABELS = { ok: 'OK', err: 'ERR', warn: 'WARN', info: 'i', tool: 'TOOL', mcp: 'MCP', user: 'USER', ai: 'AI' };
         const label = LABELS[level] || level.toUpperCase();
-        setMessages(prev => [...prev.slice(-maxMessages), {
-          id: `log-${Date.now()}`, role: 'log',
-          content: `[${label}] ${msg}`,
-        }]);
+        setLogLine(`[${label}] ${msg}`);
+        // Auto-hide after 4s of no new logs
+        if (logTimer.current) clearTimeout(logTimer.current);
+        logTimer.current = setTimeout(() => setLogLine(''), 4000);
       };
 
       bus.on('llm:text', onLlmText);
@@ -187,6 +191,13 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         connected, session: sessionId,
         toolCount: tools.length, actionCount: actions,
       }),
+
+      // Log status line (single line, auto-updating, auto-hiding)
+      logLine
+        ? React.createElement(Box, { paddingLeft: 1 },
+            React.createElement(Text, { dimColor: true, color: 'gray' }, logLine),
+          )
+        : null,
 
       // Middle: Messages
       React.createElement(Box, {

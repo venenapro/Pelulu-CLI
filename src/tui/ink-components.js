@@ -77,13 +77,6 @@ export function MessageBubble({ message }) {
     );
   }
 
-  // Log messages (from logger routed through bus)
-  if (role === 'log') {
-    return React.createElement(Box, { paddingLeft: 2 },
-      React.createElement(Text, { dimColor: true }, content),
-    );
-  }
-
   const cleanContent = stripEmojis(content);
   if (!cleanContent) return null;
 
