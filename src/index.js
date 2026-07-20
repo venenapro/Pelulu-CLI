@@ -144,12 +144,9 @@ async function main() {
       config,
     });
 
-    // Load microagents from workspace
-    await agentController.loadMicroagents(cwd);
-
-    startupLogs.push(chalk.green('  ✓ Agent system initialized (OpenHands-style)'));
-    startupLogs.push(chalk.gray(`    - Max iterations: ${config.agent?.max_iterations || 100}`));
-    startupLogs.push(chalk.gray(`    - Auto-plan: ${config.agent?.auto_plan ? 'enabled' : 'disabled'}`));
+    startupLogs.push(chalk.green('  ✓ Agent system initialized'));
+    startupLogs.push(chalk.gray(`    - Max iterations: ${config.agent?.max_iterations || 50}`));
+    startupLogs.push(chalk.gray(`    - Max input: 70 chars`));
   }
 
   // 10. Register MCP tool handler (for XiaoZhi direct tool calls)
