@@ -1,9 +1,17 @@
 /**
  * AgentLoop — Core observe→think→act cycle
- * 
- * Handles:
- * - Plain text responses from XiaoZhi (via llm:text)
- * - MCP tool calls from XiaoZhi (via mcp:tool_call)
+ *
+ * Handles the THREE ways XiaoZhi actually talks back:
+ * - Spoken replies via `tts:sentence`  ← this is the PRIMARY reply channel
+ * - Plain text replies via `llm:text`  ← rarely used, but supported
+ * - MCP tool calls via `mcp:tool_call`
+ *
+ * Turn completion is activity-aware: the loop treats text/speech/tool events as
+ * liveness and only considers the turn finished after a short quiet period, so
+ * multi-step builds (write several files, then a spoken "done") no longer look
+ * like a timeout. Previously the loop ignored `tts:sentence` entirely, so after
+ * a tool ran it waited out the full timeout and reported "XiaoZhi not
+ * responding" even though XiaoZhi had already answered by voice.
  */
 import { bus } from '../core/event-bus.js';
 import { debug } from '../core/logger.js';
@@ -22,9 +30,16 @@ export class AgentLoop {
   #maxIterations;
   #abortController = null;
   #history = [];
+  #idleTimeoutMs;
+  #quietMs;
 
-  constructor({ maxIterations = 50 } = {}) {
+  constructor({ maxIterations = 50, idleTimeoutMs = 45000, quietMs = 2500 } = {}) {
     this.#maxIterations = maxIterations;
+    // Hard cap: reject only if NOTHING at all (text, speech, tool) arrives for
+    // this long. Reset on every event, so long multi-tool turns stay alive.
+    this.#idleTimeoutMs = idleTimeoutMs;
+    // A spoken/text reply is considered complete after this much silence.
+    this.#quietMs = quietMs;
   }
 
   get state() { return this.#state; }
@@ -160,70 +175,92 @@ export class AgentLoop {
   }
 
   /**
-   * Wait for response from XiaoZhi (text or MCP tool call)
-   * Does NOT send prompt — that's done once in #sendOnce
+   * Wait for the next thing XiaoZhi does: a tool call, or a text/spoken reply.
+   * Does NOT send the prompt — that happens once in #sendOnce.
+   *
+   * Resolves with:
+   *   { type: 'tool_call', ... }  when XiaoZhi invokes an MCP tool
+   *   { type: 'text', content }   when a text/spoken reply settles (quiet gap)
+   * Rejects with a Timeout error only if NOTHING arrives for #idleTimeoutMs.
    */
   #waitForResponse() {
     return new Promise((resolve, reject) => {
       let resolved = false;
       let buffer = '';
-      let timer = null;
-      let gotToolCall = false;
+      let quietTimer = null;
+      let idleTimer = null;
 
       const cleanup = () => {
-        if (timer) clearTimeout(timer);
-        bus.off('llm:text', onText);
+        if (quietTimer) clearTimeout(quietTimer);
+        if (idleTimer) clearTimeout(idleTimer);
+        bus.off('llm:text', onReplyText);
+        bus.off('tts:sentence', onReplyText);
         bus.off('mcp:tool_call', onTool);
+        bus.off('mcp:tool_result', onLiveness);
       };
 
-      const onText = (text) => {
-        if (resolved || gotToolCall) return;
-        buffer += text;
-        
+      const finishText = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        resolve({ type: 'text', content: buffer.trim() });
+      };
+
+      // Reset the hard idle cap on ANY sign of life (text, speech, tools).
+      const armIdle = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (resolved) return;
+          // If we already have a partial reply, treat it as done rather than
+          // discarding a real answer as a timeout.
+          if (buffer.trim()) { finishText(); return; }
+          resolved = true;
+          cleanup();
+          reject(new Error('Timeout: XiaoZhi not responding'));
+        }, this.#idleTimeoutMs);
+      };
+
+      // XiaoZhi's reply arrives as spoken sentences (tts:sentence) and/or
+      // plain text (llm:text). We accumulate both and consider the reply
+      // finished once it goes quiet for #quietMs.
+      const onReplyText = (text) => {
+        if (resolved) return;
+        buffer += (buffer ? ' ' : '') + text;
         bus.emit('agent:progress', {
           state: 'receiving',
           message: `Receiving: ${buffer.length} chars...`,
         });
-
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-          if (!resolved && !gotToolCall && buffer) {
-            resolved = true;
-            cleanup();
-            resolve({ type: 'text', content: buffer.trim() });
-          }
-        }, 2000);
+        armIdle();
+        if (quietTimer) clearTimeout(quietTimer);
+        quietTimer = setTimeout(finishText, this.#quietMs);
       };
 
+      // A tool call interrupts text buffering — hand control back to the loop
+      // so it can wait for the tool result, then keep listening next iteration.
       const onTool = (data) => {
         if (resolved) return;
-        gotToolCall = true;
         resolved = true;
         cleanup();
         resolve({ type: 'tool_call', ...data });
       };
 
-      // Timeout after 60s
-      const timeout = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          cleanup();
-          reject(new Error('Timeout: XiaoZhi not responding'));
-        }
-      }, 60000);
+      // Tool results are liveness only: they keep the idle cap from firing
+      // while XiaoZhi works through several tools before speaking.
+      const onLiveness = () => { if (!resolved) armIdle(); };
 
-      // Abort handler
       this.#abortController.signal.addEventListener('abort', () => {
-        if (!resolved) {
-          resolved = true;
-          cleanup();
-          clearTimeout(timeout);
-          reject(new Error('AbortError'));
-        }
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        reject(new Error('AbortError'));
       }, { once: true });
 
-      bus.on('llm:text', onText);
+      bus.on('llm:text', onReplyText);
+      bus.on('tts:sentence', onReplyText);
       bus.on('mcp:tool_call', onTool);
+      bus.on('mcp:tool_result', onLiveness);
+
+      armIdle();
     });
   }
 

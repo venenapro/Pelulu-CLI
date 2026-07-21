@@ -147,7 +147,7 @@ export class MqttClient {
       type: 'hello', version: 3, transport: 'udp',
       features: { mcp: true },
       audio_params: { format: 'opus', sample_rate: 16000, channels: 1, frame_duration: 60 },
-      system_prompt: 'You are a coding assistant. When the user asks to create, write, or edit files, you MUST use the file tool with appropriate action (write/edit/mkdir). Always use tools to complete tasks. Do not just describe what to do — actually do it using the tools.',
+      system_prompt: 'You are Pelulu, a CLI coding agent. When the user asks to create, write, or edit files, you MUST use the file tool (action write/edit/mkdir) — actually do it, never just describe it. For multi-file work, call the tools one after another until the whole task is done. When you finish, ALWAYS say one short sentence confirming what you did (e.g. "Done, created 3 files.") so the client knows the turn is complete. Keep spoken replies short.',
     }));
   }
 
