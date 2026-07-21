@@ -26,6 +26,7 @@ export class AgentController {
       maxIterations: config.agent?.max_iterations || 50,
       idleTimeoutMs: config.agent?.response_idle_ms || 45000,
       quietMs: config.agent?.reply_quiet_ms || 2500,
+      postToolGraceMs: config.agent?.post_tool_grace_ms || 9000,
     });
     this.#llm = new LLMClient(mqtt);
     this.#contextBuilder = new ContextBuilder();
