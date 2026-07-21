@@ -43,7 +43,7 @@ export class McpHandler {
           result: {
             protocolVersion: PROTOCOL_VERSION,
             capabilities: { tools: {} },
-            serverInfo: { name: 'shellulu', version: '1.0.0' },
+            serverInfo: { name: 'pelulu-cli', version: '1.0.0' },
           },
         },
       });
@@ -58,13 +58,18 @@ export class McpHandler {
     if (p.method === 'tools/list') {
       this.#toolsReceived = true;
       this.#nameMap.clear();
-      const tools = (this.#toolsFn?.() || []).map(t => {
+      let tools = (this.#toolsFn?.() || []).map(t => {
         const safeName = this._sanitize(t.name);
         this.#nameMap.set(safeName, t.name);
         return this._optimizeTool({ name: safeName, description: t.description, inputSchema: t.inputSchema || { type: 'object', properties: {} } });
       });
+      // Hard guard: the XiaoZhi broker disconnects the client if the
+      // tools/list payload exceeds ~8KB. Progressively shrink until it fits so
+      // a newly added tool can never silently break the whole connection.
+      tools = this._fitUnderLimit(tools, p.id);
+      const bytes = Buffer.byteLength(JSON.stringify({ jsonrpc: '2.0', id: p.id, result: { tools } }));
       responses.push({ type: 'mcp', payload: { jsonrpc: '2.0', id: p.id, result: { tools } } });
-      log('mcp', `Sent ${tools.length} tools`);
+      log('mcp', `Sent ${tools.length} tools (${bytes} bytes)`);
     }
 
     if (p.method === 'tools/call') {
@@ -88,6 +93,33 @@ export class McpHandler {
 
   _sanitize(name) {
     return String(name).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  }
+
+  /**
+   * Keep the serialized tools/list under the broker's ~8KB limit.
+   * Step 1: trim descriptions. Step 2: drop schema properties down to just
+   * `action`. We stop as soon as we're safely under the limit.
+   */
+  _fitUnderLimit(tools, id, limit = 7800) {
+    const size = (t) => Buffer.byteLength(JSON.stringify({ jsonrpc: '2.0', id, result: { tools: t } }));
+    if (size(tools) <= limit) return tools;
+
+    // Step 1: shorten descriptions to ~40 chars.
+    let trimmed = tools.map(t => ({ ...t, description: (t.description || '').slice(0, 40) }));
+    if (size(trimmed) <= limit) { log('warn', 'tools/list trimmed descriptions to fit 8KB'); return trimmed; }
+
+    // Step 2: reduce each schema to only the `action` property.
+    trimmed = trimmed.map(t => {
+      const props = t.inputSchema?.properties || {};
+      const minimal = props.action ? { action: props.action } : {};
+      return { ...t, description: (t.description || '').slice(0, 24), inputSchema: { type: 'object', properties: minimal } };
+    });
+    if (size(trimmed) <= limit) { log('warn', 'tools/list reduced schemas to fit 8KB'); return trimmed; }
+
+    // Step 3 (last resort): drop tools from the end until it fits.
+    while (trimmed.length > 1 && size(trimmed) > limit) trimmed.pop();
+    log('warn', `tools/list truncated to ${trimmed.length} tools to fit 8KB`);
+    return trimmed;
   }
 
   /**

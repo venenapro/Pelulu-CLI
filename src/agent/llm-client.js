@@ -20,18 +20,12 @@ export class LLMClient {
    */
   async #waitForReady() {
     if (this.#mqtt.mcp?.toolsReceived && this.#mqtt.sessionId) return;
-    debug('llm', 'Waiting for MCP handshake...');
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('MCP handshake timeout')), 30000);
-      const check = setInterval(() => {
-        if (this.#mqtt.mcp?.toolsReceived && this.#mqtt.sessionId) {
-          clearInterval(check);
-          clearTimeout(timeout);
-          debug('llm', 'MCP ready');
-          resolve();
-        }
-      }, 200);
-    });
+    debug('llm', 'Session not ready — re-establishing...');
+    // Actively re-send hello to recover from an idle `goodbye`, rather than
+    // polling for a session that will never come back on its own.
+    const ok = await this.#mqtt.ensureSession(30000);
+    if (!ok) throw new Error('MCP handshake timeout');
+    debug('llm', 'MCP ready');
   }
 
   /**

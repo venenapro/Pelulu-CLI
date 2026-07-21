@@ -20,13 +20,28 @@ export class MqttClient {
     this.mqttCfg = null;
     this.mcp = new McpHandler();
     this._helloQueue = [];
+    // Reconnection state — we manage reconnect ourselves because the broker
+    // hands out FRESH credentials from OTA on every connection (cached creds
+    // are rejected), so mqtt.js's built-in reconnect can never recover.
+    this._manualClose = false;
+    this._reconnectTimer = null;
+    this._reconnectAttempts = 0;
   }
 
   async connect() {
     if (!this.deviceId) this.deviceId = this._randomMac();
     if (!this.clientId) this.clientId = crypto.randomUUID();
     await this._persistIds();
+    this._manualClose = false;
+    return this._refreshAndConnect();
+  }
 
+  /**
+   * Fetch fresh OTA credentials, then (re)connect. Used for the initial
+   * connection AND every reconnect — the broker requires new credentials
+   * each time, so we must always re-run the OTA handshake.
+   */
+  async _refreshAndConnect() {
     log('info', 'Fetching device config...');
     const data = await fetchOtaConfig(this.config.mqtt.ota_url, this.deviceId, this.clientId);
     this.mqttCfg = await handleActivation(data, this.config.mqtt.ota_url, this.deviceId, this.clientId);
@@ -46,36 +61,78 @@ export class MqttClient {
 
   _connectMqtt() {
     return new Promise((resolve, reject) => {
+      // Tear down any previous client so we never leak listeners / sockets.
+      if (this.client) {
+        try { this.client.removeAllListeners(); this.client.end(true); } catch {}
+        this.client = null;
+      }
+
       this.client = mqtt.connect(`mqtts://${this.mqttCfg.endpoint}:8883`, {
         clientId: this.mqttCfg.client_id,
         username: this.mqttCfg.username,
         password: this.mqttCfg.password,
         keepalive: 60,
-        reconnectPeriod: 5000,
-        connectTimeout: 10000,
+        reconnectPeriod: 0, // we manage reconnect ourselves (fresh OTA creds required)
+        connectTimeout: 15000,
         clean: true,
         protocolVersion: 4, // MQTT v3.1.1
       });
 
+      let settled = false;
+
       this.client.on('connect', () => {
         this.connected = true;
+        this._reconnectAttempts = 0;
         log('ok', 'MQTT Connected');
         this.client.subscribe('devices/p2p/#');
         this._sendHello();
-        resolve();
+        bus.emit('mqtt:connected');
+        if (!settled) { settled = true; resolve(); }
       });
 
       this.client.on('message', (_, raw) => this._onMessage(raw));
       this.client.on('error', e => { log('err', `MQTT: ${e.message}`); bus.emit('mqtt:error', e); });
       this.client.on('close', () => {
+        const wasConnected = this.connected;
         this.connected = false;
         this.sessionId = null;
+        // A dropped MQTT connection invalidates the whole MCP handshake — the
+        // server re-runs initialize/tools/list on the next connection, so a
+        // full reset here is correct (unlike a `goodbye`, see _onOther).
         this.mcp.reset();
         this._helloQueue = [];
-        log('warn', 'MQTT Disconnected');
+        if (wasConnected) log('warn', 'MQTT Disconnected');
+        bus.emit('mqtt:disconnected');
+        // Kick off our own reconnect (fresh OTA credentials) unless the user
+        // asked to disconnect. This is what recovers from the sudden drops.
+        if (!this._manualClose) this._scheduleReconnect();
+        if (!settled) { settled = true; reject(new Error('MQTT connection closed before ready')); }
       });
-      this.client.on('reconnect', () => log('info', 'MQTT Reconnecting...'));
     });
+  }
+
+  /**
+   * Reconnect with exponential backoff. Each attempt re-fetches OTA config so
+   * we always present valid, fresh credentials to the broker.
+   */
+  _scheduleReconnect() {
+    if (this._reconnectTimer || this._manualClose) return;
+    this._reconnectAttempts++;
+    const delay = Math.min(30000, 2000 * Math.pow(1.6, Math.min(this._reconnectAttempts - 1, 6)));
+    log('info', `MQTT reconnecting in ${Math.round(delay / 1000)}s (attempt ${this._reconnectAttempts})...`);
+    bus.emit('mqtt:reconnecting', { attempt: this._reconnectAttempts, delay });
+    this._reconnectTimer = setTimeout(async () => {
+      this._reconnectTimer = null;
+      if (this._manualClose) return;
+      try {
+        await this._refreshAndConnect();
+        log('ok', 'MQTT reconnected');
+        bus.emit('mqtt:reconnected');
+      } catch (e) {
+        log('err', `Reconnect failed: ${e.message}`);
+        this._scheduleReconnect();
+      }
+    }, delay);
   }
 
   _sendHello() {
@@ -139,7 +196,16 @@ export class MqttClient {
     if (msg.type === 'stt') { log('user', `"${msg.text}"`); bus.emit('stt', msg.text); }
     if (msg.type === 'llm' && msg.text) { bus.emit('llm:text', msg.text); }
     if (msg.type === 'tts' && msg.state === 'sentence_start' && msg.text) { bus.emit('tts:sentence', msg.text); }
-    if (msg.type === 'goodbye') { this.sessionId = null; this.mcp.reset(); this._helloQueue = []; }
+    if (msg.type === 'goodbye') {
+      // A server `goodbye` only closes the audio SESSION — the MQTT connection
+      // and the MCP handshake (tools/list) remain valid. So we must NOT reset
+      // the MCP handler here; doing so made ensureSession() wait forever for a
+      // tools/list that never comes again, which looked like a permanent
+      // disconnect. We only drop the session id; the next message re-opens a
+      // session via a fresh hello (see ensureSession).
+      this.sessionId = null;
+      bus.emit('session:end');
+    }
   }
 
   _send(msg) {
@@ -148,10 +214,40 @@ export class MqttClient {
     this.client.publish(this.mqttCfg.publish_topic, JSON.stringify(msg));
   }
 
-  sendText(text) {
+  /**
+   * Ensure a live XiaoZhi session exists before sending.
+   * XiaoZhi ends idle sessions with `goodbye` (common during long local
+   * tasks). When that happens we must re-send `hello` to get a fresh session
+   * + MCP handshake, otherwise all further messages are silently dropped.
+   * Resolves true once ready, false on timeout.
+   */
+  async ensureSession(timeoutMs = 15000) {
+    if (this.sessionId && this.mcp.toolsReceived) return true;
+    if (!this.client) return false;
+
+    // Re-initiate the handshake (server replies with a new hello + session_id)
+    this._sendHello();
+
+    return new Promise((resolve) => {
+      if (this.sessionId && this.mcp.toolsReceived) return resolve(true);
+      const onReady = () => { cleanup(); resolve(true); };
+      const poll = setInterval(() => {
+        if (this.sessionId && this.mcp.toolsReceived) { cleanup(); resolve(true); }
+      }, 200);
+      const timer = setTimeout(() => { cleanup(); resolve(false); }, timeoutMs);
+      const cleanup = () => { clearInterval(poll); clearTimeout(timer); bus.off('ready', onReady); };
+      bus.on('ready', onReady);
+    });
+  }
+
+  async sendText(text) {
+    // Re-establish the session if XiaoZhi dropped it while idle.
+    const ok = await this.ensureSession();
+    if (!ok) { bus.emit('session:dead'); return false; }
     this._send({ type: 'listen', state: 'detect', text });
     log('user', `"${text}"`);
     bus.emit('user:text', text);
+    return true;
   }
 
   abort() { this._send({ type: 'abort' }); }
@@ -166,7 +262,12 @@ export class MqttClient {
   }
 
   disconnect() {
-    if (this.client) { this.client.end(true); this.client = null; }
+    this._manualClose = true;
+    if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
+    if (this.client) {
+      try { this.client.removeAllListeners(); this.client.end(true); } catch {}
+      this.client = null;
+    }
     this.connected = false;
   }
 }

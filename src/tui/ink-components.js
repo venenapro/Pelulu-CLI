@@ -24,7 +24,9 @@ async function readPkgVersion() {
 readPkgVersion();
 
 // ─── ASCII Banner ────────────────────────────────────────
-// Memoized — only re-renders when version prop changes
+// Memoized — only re-renders when version prop changes.
+// Uses useMemo to cache the element reference so Ink's reconciler
+// skips re-rendering on every parent state change (fixes banner duplication).
 export const AsciiBanner = React.memo(function AsciiBanner({ version }) {
   const v = version || '0.0.0';
 
@@ -64,13 +66,14 @@ export const AsciiBanner = React.memo(function AsciiBanner({ version }) {
 });
 
 // ─── Status Bar ───────────────────────────────────────────
-// Memoized — only re-renders when connected/session changes
+// Uses useMemo to cache the element — avoids re-rendering on parent state changes
 export const StatusBar = React.memo(function StatusBar({ connected, session }) {
   const statusDot = connected ? '●' : '○';
   const statusColor = connected ? 'green' : 'red';
   const sess = session ? session.slice(0, 8) : '---';
+  const label = connected ? ' online' : ' offline';
 
-  return React.createElement(Box, {
+  const element = React.useMemo(() => React.createElement(Box, {
     borderStyle: 'single', borderColor: 'cyan', width: '100%',
     paddingX: 1, paddingY: 0,
     flexDirection: 'row', justifyContent: 'space-between',
@@ -78,16 +81,15 @@ export const StatusBar = React.memo(function StatusBar({ connected, session }) {
     React.createElement(Box, { flexDirection: 'row' },
       React.createElement(Text, { color: 'cyan', bold: true }, 'PELULU '),
       React.createElement(Text, { color: statusColor }, statusDot),
-      React.createElement(Text, { color: statusColor, bold: connected },
-        connected ? ' online' : ' offline'
-      ),
+      React.createElement(Text, { color: statusColor, bold: connected }, label),
     ),
     React.createElement(Box, { flexDirection: 'row' },
       React.createElement(Text, { dimColor: true }, `session:${sess}`),
       React.createElement(Text, { dimColor: true }, '  '),
       React.createElement(Text, { dimColor: true }, 'xiaozhi.me'),
     ),
-  );
+  ), [connected, sess]);
+  return element;
 });
 
 // ─── Strip Emojis ─────────────────────────────────────────

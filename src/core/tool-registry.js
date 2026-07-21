@@ -51,6 +51,26 @@ export class ToolRegistry {
   }
 
   toMcpTools() {
+    // Trimmed descriptions to stay under XiaoZhi broker 8KB limit
+    const desc = {
+      agent: 'Agent: spawn, list, status',
+      ai: 'Code analysis, summarize, diff',
+      config: 'Config: get, set, list, reset',
+      diff: 'File comparison: compare, patch',
+      env: 'Env variables: get, set, list',
+      file: 'File ops: read, write, edit, delete, copy',
+      git: 'Git: init, clone, status, diff, commit, push',
+      history: 'Tool history: list, clear, stats',
+      jobs: 'Poll background jobs: list, status, wait, result, cancel',
+      network: 'Network: fetch, download, ping',
+      process: 'Process: list, info, kill, top',
+      project: 'Project: init, build, test, lint',
+      search: 'Search: grep, find, web fetch',
+      shell: 'Shell: exec, background, ps, kill',
+      snippet: 'Snippets: save, load, list, delete',
+      template: 'Templates: list, create, info',
+      watch: 'File watch: start, stop, status',
+    };
     return this.all().map(t => {
       const schema = t.inputSchema || { type: 'object', properties: {} };
       const compact = { type: 'object', properties: {} };
@@ -62,7 +82,7 @@ export class ToolRegistry {
           compact.properties[k] = prop;
         }
       }
-      return { name: t.name, description: t.description, inputSchema: compact };
+      return { name: t.name, description: desc[t.name] || t.description, inputSchema: compact };
     });
   }
 
@@ -70,11 +90,31 @@ export class ToolRegistry {
     const tool = this.#tools.get(name);
     if (!tool) return { isError: true, content: [{ type: 'text', text: `Unknown tool: ${name}` }] };
     try {
-      const result = await tool.handler(args);
+      const result = await tool.handler(args, this._toolsRef());
       return { isError: false, content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result) }] };
     } catch (e) {
       return { isError: true, content: [{ type: 'text', text: e.message }] };
     }
+  }
+
+  /** Call a tool and return parsed result (for internal tool-to-tool calls) */
+  async callParsed(name, args = {}) {
+    const tool = this.#tools.get(name);
+    if (!tool) throw new Error(`Unknown tool: ${name}`);
+    return await tool.handler(args, this._toolsRef());
+  }
+
+  /**
+   * The reference handed to every tool handler. Beyond `call`, it exposes tool
+   * discovery (`has` / `names`) so orchestrator tools can adapt dynamically to
+   * whatever tools are actually loaded instead of hardcoding a fixed pipeline.
+   */
+  _toolsRef() {
+    return {
+      call: (toolName, toolArgs) => this.callParsed(toolName, toolArgs),
+      has: (toolName) => this.#tools.has(toolName),
+      names: () => [...this.#tools.keys()],
+    };
   }
 
   async shutdown() {

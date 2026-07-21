@@ -13,10 +13,12 @@ import { dirname, join } from 'path';
 import { readFile } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
-import { loadConfig, saveConfig } from './core/config.js';
+import { existsSync } from 'fs';
+import { loadConfig, saveConfig, expand } from './core/config.js';
 import { log, setDebug, debug, setInkMode, initFileLog, flushLogs, getLogFile, writeRawToLog } from './core/logger.js';
 import { bus } from './core/event-bus.js';
 import { ToolRegistry } from './core/tool-registry.js';
+import { jobManager } from './core/job-manager.js';
 import { Sandbox } from './core/sandbox.js';
 import { SessionState } from './core/session.js';
 import { Stats } from './core/stats.js';
@@ -177,24 +179,84 @@ async function main() {
 
   // 10. Register MCP tool handler (for XiaoZhi direct tool calls)
   // Agent calls are auto-approved — XiaoZhi controls the flow, no y/N prompts
+  // File tool actions that mutate the filesystem — tracked + surfaced in chat
+  const FILE_MUTATIONS = ['write', 'edit', 'delete', 'mkdir', 'copy', 'move'];
+
   mqtt.registerToolHandler(
     async (name, args) => {
       sandbox.validate(name, args);
 
       thinking.set('tool_call');
       const start = Date.now();
-      try {
-        const result = await registry.call(name, args);
+
+      // Capture pre-state so we can report created vs modified accurately
+      const trackedPath = args?.to || args?.path;
+      let preExisted = false;
+      if (name === 'file' && FILE_MUTATIONS.includes(args?.action) && trackedPath) {
+        try { preExisted = existsSync(expand(trackedPath)); } catch {}
+      }
+
+      // Post-processing shared by the inline and background completion paths:
+      // record stats, track file mutations, and surface the result in the TUI.
+      const finalize = (result) => {
         stats.record(name, args.action, !result.isError, Date.now() - start);
         session.addToolCall(name, args, result);
 
-        if (name === 'file' && (args.action === 'write' || args.action === 'edit') && args.path) {
-          autoFormat(args.path).catch(() => {});
+        // Track file changes and broadcast them so the TUI can show tracking in chat
+        if (name === 'file' && !result.isError && FILE_MUTATIONS.includes(args.action) && trackedPath) {
+          const change =
+            args.action === 'delete' ? 'deleted'
+            : (args.action === 'edit' || preExisted) ? 'modified'
+            : 'created';
+          fileTracker.track(trackedPath, change);
+          bus.emit('files:changed', { path: trackedPath, change, changes: fileTracker.getChanges() });
+
+          if (args.action === 'write' || args.action === 'edit') {
+            autoFormat(trackedPath).catch(() => {});
+          }
         }
 
-        thinking.set('idle');
         bus.emit('tool:called', { name, result, args });
-        return result;
+      };
+
+      try {
+        // Route EVERY tool action through the job layer. Fast actions resolve
+        // inline (unchanged UX); slow ones background themselves and return a
+        // pollable job handle so XiaoZhi never assumes a timeout while the tool
+        // is still working. The AI polls progress/results with the `jobs` tool.
+        const dispatched = await jobManager.dispatch(
+          { tool: name, action: args.action, label: `${name}${args.action ? `.${args.action}` : ''}` },
+          () => registry.call(name, args),
+        );
+
+        if (dispatched.done) {
+          if (dispatched.error) throw dispatched.error;
+          finalize(dispatched.result);
+          thinking.set('idle');
+          return dispatched.result;
+        }
+
+        // Backgrounded: tell XiaoZhi it's running and how to follow up. Finalize
+        // the real result once the background work completes.
+        const job = dispatched.job;
+        jobManager.wait(job.id, 3_600_000).then(() => {
+          if (job.status === 'done' && job.result) {
+            const wrapped = { isError: false, content: [{ type: 'text', text: typeof job.result === 'string' ? job.result : JSON.stringify(job.result) }] };
+            finalize(wrapped);
+          }
+        }).catch(() => {});
+
+        thinking.set('idle');
+        return {
+          isError: false,
+          content: [{ type: 'text', text: JSON.stringify({
+            status: 'running',
+            job_id: job.id,
+            tool: name,
+            action: args.action,
+            message: `"${name}${args.action ? `.${args.action}` : ''}" is running in the background (job ${job.id}). It is NOT an error or timeout. Poll it with the jobs tool: {"action":"wait","id":"${job.id}"} to wait, or {"action":"status","id":"${job.id}"} to check progress.`,
+          }) }],
+        };
       } catch (e) {
         stats.record(name, args.action, false, Date.now() - start, e.message);
         thinking.set('idle');

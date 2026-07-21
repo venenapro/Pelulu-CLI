@@ -7,27 +7,19 @@ import { exec } from 'child_process';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import { log } from '../core/logger.js';
-
-function httpGet(url, maxChars = 5000) {
-  return new Promise((resolve, reject) => {
-    const client = url.startsWith('https') ? https : http;
-    client.get(url, { timeout: 15000, headers: { 'User-Agent': 'coding-agent/1.0' } }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return httpGet(res.headers.location, maxChars).then(resolve, reject);
-      }
-      let d = '';
-      res.on('data', c => { if (d.length < maxChars) d += c; });
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: d }));
-    }).on('error', reject);
-  });
-}
+import { request as httpClientRequest } from '../core/http-client.js';
 
 const ACTIONS = {
   async fetch({ url, method, body, headers }) {
     if (!url) throw new Error('url required');
-    log('network', `[WEB] ${method || 'GET'} ${url}`);
-    const result = await httpGet(url);
-    return { url, status: result.status, body: result.body.slice(0, 5000) };
+    const m = method || 'GET';
+    log('network', `[WEB] ${m} ${url}`);
+    const r = await httpClientRequest(url, { method: m, body, headers: headers || {}, timeout: 15000, followRedirects: true, maxBody: 200000 });
+    return {
+      url: r.finalUrl || url, status: r.status, headers: r.headers,
+      redirects: r.redirectChain, duration_ms: r.duration_ms,
+      body: r.body.slice(0, 8000), body_length: r.bytes,
+    };
   },
 
   async download({ url, path }) {

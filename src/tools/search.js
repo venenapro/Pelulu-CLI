@@ -3,9 +3,8 @@
  * Actions: grep, find, web
  */
 import { exec } from 'child_process';
-import https from 'https';
-import http from 'http';
 import { log } from '../core/logger.js';
+import { request as httpClientRequest } from '../core/http-client.js';
 
 function runCmd(cmd, timeout = 10000) {
   return new Promise((resolve) => {
@@ -15,18 +14,10 @@ function runCmd(cmd, timeout = 10000) {
   });
 }
 
-function httpGet(url, maxChars = 8000) {
-  return new Promise((resolve, reject) => {
-    const client = url.startsWith('https') ? https : http;
-    client.get(url, { timeout: 15000, headers: { 'User-Agent': 'coding-agent/1.0' } }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return httpGet(res.headers.location, maxChars).then(resolve, reject);
-      }
-      let d = '';
-      res.on('data', c => { if (d.length < maxChars) d += c; });
-      res.on('end', () => resolve({ status: res.statusCode, body: d }));
-    }).on('error', reject);
-  });
+// Delegates to the shared HTTP engine (gzip-aware, follows redirects).
+async function httpGet(url, maxChars = 8000) {
+  const r = await httpClientRequest(url, { timeout: 15000, followRedirects: true, maxBody: Math.max(maxChars, 8000) });
+  return { status: r.status, body: r.body.slice(0, maxChars) };
 }
 
 const ACTIONS = {
