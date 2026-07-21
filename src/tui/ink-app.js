@@ -34,6 +34,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     const taskTimer = useRef(null);       // long-running task liveness watchdog
     const lastPhaseRef = useRef(null);
     const taskRunningRef = useRef(false);  // a background task is active
+    const agentBusyRef = useRef(false);    // a XiaoZhi turn is actively in progress
     const wasConnectedRef = useRef(mqtt.connected); // dedupe "connected" spam
     const STUCK_TIMEOUT_MS = config?.agent?.stuck_timeout_ms || 45000;
     // A single step can legitimately run a while; only warn if a task
@@ -149,18 +150,22 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
         }
         wasConnectedRef.current = false;
       };
-      const onSessionEnd = () => {
-        // XiaoZhi ended the session (idle). The next message now auto-reconnects
-        // (see mqtt.ensureSession), so this is silent unless the user is waiting.
+      const onSessionEnd = (info) => {
+        // XiaoZhi ended the audio session (idle `goodbye`). The next message now
+        // auto-reconnects (see mqtt.ensureSession), so this is silent unless the
+        // user is waiting.
         setSessionId(null);
-        // Don't nag mid-task: background tasks run locally and don't need the session.
-        if (!taskRunningRef.current) {
-          setThinking('idle');
-          clearWatchdog();
-          // Surface a subtle, reassuring notice so a paused session doesn't look
-          // like a silent reset — the next message reconnects automatically.
-          pushSystem('XiaoZhi session paused — it resumes automatically when you send your next message.');
-        }
+        // Don't nag while work is still in progress. A `goodbye` that lands mid
+        // turn is handled by mqtt-client (it re-opens the session so the current
+        // task keeps talking to XiaoZhi); showing "session paused" here would be
+        // wrong and alarming. Background tasks run locally and don't need the
+        // session either.
+        if (taskRunningRef.current || agentBusyRef.current || info?.turnActive) return;
+        setThinking('idle');
+        clearWatchdog();
+        // Surface a subtle, reassuring notice so a paused session doesn't look
+        // like a silent reset — the next message reconnects automatically.
+        pushSystem('XiaoZhi session paused — it resumes automatically when you send your next message.');
       };
       const onSessionDead = () => {
         // ensureSession() failed to re-establish — tell the user explicitly
@@ -292,20 +297,33 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
       // Agent progress events
       const onAgentProgress = ({ state, message, tool, action }) => {
         if (state === 'tool') {
+          agentBusyRef.current = true;
           setThinking('tool_call');
           setLogLine(`[TOOL] ${tool}.${action || ''}...`);
           armWatchdog();
         } else if (state === 'tool_done') {
+          agentBusyRef.current = true;
           setThinking('thinking');
           setLogLine(`[TOOL] done, waiting...`);
           armWatchdog();
         } else if (state === 'receiving') {
+          agentBusyRef.current = true;
           setLogLine(`[LLM] ${message}`);
           armWatchdog();
         } else if (state === 'thinking') {
+          agentBusyRef.current = true;
           setThinking('thinking');
           armWatchdog();
+        } else if (state === 'done') {
+          // The turn finished. Without this branch the watchdog armed by the
+          // last tool_done/receiving event was never cleared, so it fired
+          // ~45s later as a bogus "still waiting on XiaoZhi to reply" even
+          // though XiaoZhi had already answered. Clear it and go idle.
+          agentBusyRef.current = false;
+          setThinking('idle');
+          clearWatchdog();
         } else if (state === 'timeout') {
+          agentBusyRef.current = false;
           setThinking('idle');
           clearWatchdog();
           setLogLine(`[WARN] ${message}`);
