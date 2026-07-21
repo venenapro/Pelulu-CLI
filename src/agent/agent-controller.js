@@ -22,7 +22,11 @@ export class AgentController {
     this.#sandbox = sandbox;
     this.#confirm = confirm;
     this.#config = config;
-    this.#loop = new AgentLoop({ maxIterations: config.agent?.max_iterations || 50 });
+    this.#loop = new AgentLoop({
+      maxIterations: config.agent?.max_iterations || 50,
+      idleTimeoutMs: config.agent?.response_idle_ms || 45000,
+      quietMs: config.agent?.reply_quiet_ms || 2500,
+    });
     this.#llm = new LLMClient(mqtt);
     this.#contextBuilder = new ContextBuilder();
   }

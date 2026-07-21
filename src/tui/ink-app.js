@@ -508,16 +508,14 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
           await new Promise(r => setTimeout(r, 500));
         }
         
-        // Use agent controller for proper response handling
+        // Use agent controller for proper response handling.
+        // NOTE: XiaoZhi's actual reply is rendered live by the `tts:sentence` /
+        // `llm:text` handlers above, so we must NOT push result.result here or
+        // the final message would appear twice. The controller run is awaited
+        // purely to drive the think→act loop and the thinking indicator.
         try {
-          const result = await agentController.run(text, { generatePlan: false });
+          await agentController.run(text, { generatePlan: false });
           setThinking('idle');
-          
-          if (result.success && result.result) {
-            setMessages(prev => [...prev.slice(-maxMessages), {
-              id: `assistant-${Date.now()}`, role: 'assistant', content: result.result,
-            }]);
-          }
         } catch (err) {
           setThinking('idle');
           setMessages(prev => [...prev.slice(-maxMessages), {
