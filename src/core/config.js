@@ -30,7 +30,7 @@ let _config = null;
 export async function loadConfig(root) {
   const path = join(root, CONFIG_FILE);
   const defaults = {
-    agent: { name: 'Pelulu CLI', version: '1.0.0', workspace: '~/Pelulu-CLI' },
+    agent: { name: 'Pelulu CLI', version: '1.1.0', workspace: '~/Pelulu-CLI' },
     mqtt: { ota_url: 'https://api.tenclass.net/xiaozhi/ota/', keepalive: 240 },
     mcp: { endpoint_url: '' },
     tools: { shell_timeout: 30000, max_output: 10000, auto_format: true },

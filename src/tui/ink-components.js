@@ -28,7 +28,7 @@ readPkgVersion();
 // Uses useMemo to cache the element reference so Ink's reconciler
 // skips re-rendering on every parent state change (fixes banner duplication).
 export const AsciiBanner = React.memo(function AsciiBanner({ version }) {
-  const v = version || '0.0.0';
+  const v = version || _pkgVersion || '0.0.0';
 
   const cat = [
     '   /\\_/\\  ',
