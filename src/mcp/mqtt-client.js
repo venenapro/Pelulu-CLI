@@ -33,6 +33,16 @@ export class MqttClient {
     this._manualClose = false;
     this._reconnectTimer = null;
     this._reconnectAttempts = 0;
+    // Whether an agent turn is actively in progress. XiaoZhi closes idle audio
+    // sessions with a `goodbye`; if that lands while we're still working we must
+    // keep the session warm (re-`hello`) instead of letting the task stall until
+    // the next user message. Driven by the agent-loop's progress events.
+    this._turnActive = false;
+    this._resuming = false;
+    bus.on('agent:progress', ({ state } = {}) => {
+      if (state === 'done' || state === 'timeout') this._turnActive = false;
+      else if (state) this._turnActive = true; // thinking/tool/tool_done/receiving
+    });
   }
 
   async connect() {
@@ -212,7 +222,19 @@ export class MqttClient {
       // disconnect. We only drop the session id; the next message re-opens a
       // session via a fresh hello (see ensureSession).
       this.sessionId = null;
-      bus.emit('session:end');
+      bus.emit('session:end', { turnActive: this._turnActive });
+      // Stay connected while there is still work in progress. If a turn is
+      // active we immediately re-open the session so the current task keeps
+      // talking to XiaoZhi, instead of stalling until the user types again.
+      // The MCP handshake is still valid (goodbye only closes the audio
+      // session), so this is a cheap `hello` round-trip, not a full reconnect.
+      if (this._turnActive && !this._manualClose && this.mcp.toolsReceived && !this._resuming) {
+        this._resuming = true;
+        this.ensureSession()
+          .then(ok => { if (ok) bus.emit('session:resumed'); })
+          .catch(() => {})
+          .finally(() => { this._resuming = false; });
+      }
     }
   }
 
