@@ -82,7 +82,18 @@ export class ToolRegistry {
           compact.properties[k] = prop;
         }
       }
-      return { name: t.name, description: desc[t.name] || t.description, inputSchema: compact };
+      // Include per-action required fields in the description so the AI
+      // knows exactly which params each action needs (MCP schema only
+      // supports a flat required array, not conditional per-action).
+      let description = desc[t.name] || t.description;
+      if (t.actions?.length) {
+        const actionReqs = t.actions
+          .filter(a => a.required?.length)
+          .map(a => `${a.name}→${a.required.join(',')}`)
+          .join('; ');
+        if (actionReqs) description += ` [required: ${actionReqs}]`;
+      }
+      return { name: t.name, description, inputSchema: compact };
     });
   }
 
