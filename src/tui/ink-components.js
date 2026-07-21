@@ -76,7 +76,7 @@ export const StatusBar = React.memo(function StatusBar({ connected, session }) {
     flexDirection: 'row', justifyContent: 'space-between',
   },
     React.createElement(Box, { flexDirection: 'row' },
-      React.createElement(Text, { color: 'cyan', bold: true }, '🐱 PELULU '),
+      React.createElement(Text, { color: 'cyan', bold: true }, 'PELULU '),
       React.createElement(Text, { color: statusColor }, statusDot),
       React.createElement(Text, { color: statusColor, bold: connected },
         connected ? ' online' : ' offline'

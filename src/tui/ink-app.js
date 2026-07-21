@@ -29,11 +29,21 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     const [scrollOffset, setScrollOffset] = useState(0); // 0 = bottom, N = scrolled up N messages
     const scrollOffsetRef = useRef(0);
 
-    // Calculate how many rows are available for messages
-    const MAX_VISIBLE_MESSAGES = 12;
-    const getAvailableRows = useCallback(() => {
-      return MAX_VISIBLE_MESSAGES;
+    // Track terminal height so the whole UI always fits inside the viewport.
+    // If the total output is taller than the terminal, Ink cannot erase the
+    // previous frame and re-prints the top border on every render — this is
+    // the "duplicate banner" bug. Keeping the tree <= terminal rows avoids it.
+    const [rows, setRows] = useState(process.stdout.rows || 24);
+    useEffect(() => {
+      const onResize = () => setRows(process.stdout.rows || 24);
+      process.stdout.on('resize', onResize);
+      return () => process.stdout.off('resize', onResize);
     }, []);
+
+    // Fixed chrome around the message window (banner + status + input +
+    // paddings + indicators). Message window gets whatever rows are left.
+    const RESERVED_ROWS = 20;
+    const MAX_RENDER_LINES = Math.max(3, rows - RESERVED_ROWS);
 
     // ─── Enable Ink mode for logger ──────────────────
     useEffect(() => {
@@ -309,8 +319,7 @@ export function createApp({ registry, mqtt, stats, session, bus, config, extras 
     const tools = registry.all();
     const actions = tools.reduce((s, t) => s + (t.actions?.length || 0), 0);
 
-    // Calculate visible messages (scrollable window, max 12 rendered lines)
-    const MAX_RENDER_LINES = 12;
+    // Calculate visible messages (scrollable window sized to terminal height)
     const totalMessages = messages.length;
     const endIdx = totalMessages - scrollOffset;
 
