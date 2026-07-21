@@ -2,6 +2,12 @@
 
 Dokumen ini berisi semua batasan XiaoZhi AI yang ditemukan selama pengembangan Pelulu-CLI dan shellulu.
 
+> **Lihat juga:** `xiaozhi-capabilities.md` untuk hasil pengukuran empiris
+> (latency, panjang input, memori, tools, session) beserta skrip reproduksinya
+> (`scripts/capabilities.js`). Beberapa angka di bawah sudah diverifikasi ulang
+> di sana (mis. panjang input terukur ~57–70 char, dan prefix ternyata tidak
+> selalu memblokir balasan).
+
 ---
 
 ## Ringkasan Batasan
