@@ -2,7 +2,7 @@
   "agent": {
     "name": "Pelulu CLI",
     "version": "1.0.0",
-    "workspace": "~/Pelulu-CLI"
+    "workspace": "/data/data/com.termux/files/home/Pelulu-CLI"
   },
   "mqtt": {
     "ota_url": "https://api.tenclass.net/xiaozhi/ota/",

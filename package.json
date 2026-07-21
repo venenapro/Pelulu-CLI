@@ -27,13 +27,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chaerulchas/Pelulu-CLI.git"
+    "url": "git+https://github.com/venenapro/Pelulu-CLI.git"
   },
   "bugs": {
-    "url": "https://github.com/chaerulchas/Pelulu-CLI/issues"
+    "url": "https://github.com/venenapro/Pelulu-CLI/issues"
   },
-  "homepage": "https://github.com/chaerulchas/Pelulu-CLI#readme",
-  "author": "chaerulchas",
+  "homepage": "https://github.com/venenapro/Pelulu-CLI#readme",
+  "author": "venenapro",
   "license": "MIT",
   "dependencies": {
     "chalk": "^5.3.0",
