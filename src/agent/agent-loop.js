@@ -80,7 +80,7 @@ export class AgentLoop {
     bus.emit('agent:progress', { state: 'thinking', message: 'Thinking...' });
 
     try {
-      const outcome = await this.#observeTurn(llm);
+      const outcome = await this.#observeTurn(llm, userPrompt);
       this.#setState(AgentState.FINISHED);
       return outcome;
     } catch (err) {
@@ -112,7 +112,7 @@ export class AgentLoop {
    *   - Hard idle: absolutely nothing (text, speech, tool call, tool result)
    *     for #idleTimeoutMs → treated as a stalled turn.
    */
-  #observeTurn(llm) {
+  #observeTurn(llm, userPrompt) {
     return new Promise((resolve, reject) => {
       let settled = false;
       let buffer = '';
@@ -187,6 +187,10 @@ export class AgentLoop {
         lastTool = name;
         this.#iteration++;
         this.#setState(AgentState.ACTING);
+        // Text spoken BEFORE a tool call is just "thinking out loud" filler
+        // (e.g. "% file...") — the real answer is what XiaoZhi says after the
+        // tools finish. Drop the filler so the final result is clean.
+        buffer = '';
         clearTimeout(quietTimer); // don't finish text while a tool is running
         clearTimeout(graceTimer);
         armIdle();
