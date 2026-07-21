@@ -9,6 +9,13 @@ import { bus } from '../core/event-bus.js';
 import { McpHandler } from './mcp-handler.js';
 import { fetchOtaConfig, handleActivation } from './activation.js';
 
+// Max serialized bytes for a single MQTT publish. The XiaoZhi broker drops the
+// connection the instant a message crosses ~8KB (see specifications/
+// xiaozhi-mqtt-broker.md). tools/list is already guarded; tool RESULTS must be
+// clamped here too, otherwise a single large file.read / recursive list / shell
+// dump silently kills the whole connection.
+const MAX_MQTT_BYTES = 7800;
+
 export class MqttClient {
   constructor(config) {
     this.config = config;
@@ -176,13 +183,14 @@ export class MqttClient {
         this.mcp.executeTool(r.name, r.args)
           .then(result => {
             log('tool', result.isError ? 'failed' : 'done');
-            this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result } });
+            this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result: this._clampResult(result) } });
             // Emit tool result event
             bus.emit('mcp:tool_result', { name: r.name, args: r.args, result, id: r.id });
           })
           .catch(err => {
-            this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result: { content: [{ type: 'text', text: err.message }], isError: true } } });
-            bus.emit('mcp:tool_result', { name: r.name, args: r.args, result: { isError: true, content: [{ type: 'text', text: err.message }] }, id: r.id });
+            const errResult = { content: [{ type: 'text', text: err.message }], isError: true };
+            this._send({ type: 'mcp', payload: { jsonrpc: '2.0', id: r.id, result: this._clampResult(errResult) } });
+            bus.emit('mcp:tool_result', { name: r.name, args: r.args, result: errResult, id: r.id });
           });
       }
     }
@@ -208,10 +216,50 @@ export class MqttClient {
     }
   }
 
+  /**
+   * Clamp an MCP tool-result so the serialized MQTT message stays under the
+   * broker's ~8KB limit. Oversized output (large file reads, recursive
+   * listings, shell dumps, search hits) would otherwise drop the whole
+   * connection the moment it's published. We truncate the result text and
+   * append a clear notice so the model knows the output was cut and can fetch
+   * the rest with a narrower request (e.g. offset/limit on file reads).
+   */
+  _clampResult(result) {
+    const measure = (res) => Buffer.byteLength(JSON.stringify({
+      type: 'mcp', payload: { jsonrpc: '2.0', id: 0, result: res }, session_id: this.sessionId || '',
+    }));
+    try {
+      if (measure(result) <= MAX_MQTT_BYTES) return result;
+
+      const text = result?.content?.[0]?.text;
+      if (typeof text !== 'string') return result; // can't safely trim non-text
+
+      const notice = '\n\n[output truncated: exceeded the 8KB transport limit — request less at once (e.g. use offset/limit for file reads or a narrower query)]';
+      // Binary-search the largest text prefix that still fits once re-wrapped.
+      let lo = 0, hi = text.length, best = 0;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const candidate = { ...result, content: [{ type: 'text', text: text.slice(0, mid) + notice }] };
+        if (measure(candidate) <= MAX_MQTT_BYTES) { best = mid; lo = mid + 1; }
+        else { hi = mid - 1; }
+      }
+      log('warn', `Tool result truncated to ${best}/${text.length} chars to fit 8KB`);
+      return { ...result, content: [{ type: 'text', text: text.slice(0, best) + notice }] };
+    } catch { return result; }
+  }
+
   _send(msg) {
     if (!this.client || !this.mqttCfg) return;
     if (this.sessionId) msg.session_id = this.sessionId;
-    this.client.publish(this.mqttCfg.publish_topic, JSON.stringify(msg));
+    const payload = JSON.stringify(msg);
+    // Final safety net: never publish a message that would trip the broker's
+    // ~8KB cutoff and drop the connection. Results are pre-clamped above; this
+    // catches any other oversized message type before it does damage.
+    if (Buffer.byteLength(payload) > MAX_MQTT_BYTES) {
+      log('warn', `Dropping oversized MQTT message (${Buffer.byteLength(payload)} bytes > ${MAX_MQTT_BYTES})`);
+      return;
+    }
+    this.client.publish(this.mqttCfg.publish_topic, payload);
   }
 
   /**
