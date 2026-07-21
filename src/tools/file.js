@@ -46,13 +46,19 @@ const ACTIONS = {
   },
 
   edit: {
-    required: ['path', 'old_text', 'new_text'],
+    // new_text is intentionally NOT required: XiaoZhi (a voice model) often
+    // omits it — either it means "delete this text" or it dropped the field
+    // mid-call. Treating a missing/undefined new_text as an empty string keeps
+    // the edit working (as a deletion) instead of failing the whole turn with
+    // "Missing required field: new_text".
+    required: ['path', 'old_text'],
     handler: async ({ path, old_text, new_text }) => {
       const abs = safe(path);
+      const replacement = new_text ?? '';
       let content = await readFile(abs, 'utf-8');
       if (!content.includes(old_text)) throw new Error(`old_text not found in ${abs}`);
       const count = content.split(old_text).length - 1;
-      content = content.replace(old_text, new_text);
+      content = content.split(old_text).join(replacement);
       await writeFile(abs, content, 'utf-8');
       log('file', `[EDIT] Edited: ${abs} (${count} occurrence(s))`);
       return { path: abs, edited: true, occurrences: count };
