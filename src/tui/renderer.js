@@ -65,7 +65,7 @@ export async function renderAsciiBanner() {
   const info = [
     chalk.cyan.bold('P E L U L U - C L I'),
     chalk.gray(`v${version}`),
-    chalk.cyan('coding companion'),
+    chalk.cyan('the tiny coding companion'),
     chalk.gray('powered by XiaoZhi'),
     '',
   ];

@@ -40,7 +40,7 @@ export const AsciiBanner = React.memo(function AsciiBanner({ version }) {
   const info = [
     'P E L U L U - C L I',
     `v${v}`,
-    'coding companion',
+    'the tiny coding companion',
     'powered by XiaoZhi',
     '',
   ];
