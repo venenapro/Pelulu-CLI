@@ -1,14 +1,18 @@
 /**
  * Git Tool — consolidated git operations (1 MCP tool, 10 actions)
  * Actions: init, clone, status, diff, log, add, commit, push, pull, branch
+ *
+ * Long-running operations (clone, push, pull) stream progress via task:progress
+ * so the TUI shows live feedback instead of appearing stuck.
  */
 import { exec } from 'child_process';
 import { log } from '../core/logger.js';
 import { getConfig } from '../core/config.js';
+import { bus } from '../core/event-bus.js';
 
-function git(cmd, cwd) {
+function git(cmd, cwd, { timeout = 60000 } = {}) {
   return new Promise((resolve, reject) => {
-    exec(`git ${cmd}`, { cwd, timeout: 30000, maxBuffer: 512 * 1024 }, (err, stdout, stderr) => {
+    exec(`git ${cmd}`, { cwd, timeout, maxBuffer: 512 * 1024 }, (err, stdout, stderr) => {
       if (err?.killed) return reject(new Error('Git timed out'));
       resolve({ stdout: stdout?.trim() || '', stderr: stderr?.trim() || '', code: err?.code ?? 0 });
     });
@@ -16,6 +20,37 @@ function git(cmd, cwd) {
 }
 
 function cwd(params) { return params?.cwd || getConfig().agent?.workspace || process.cwd(); }
+
+/**
+ * Run a git command with progress reporting. For operations that may take
+ * a while (clone, push, pull), emits task:progress events.
+ */
+async function gitWithProgress(cmd, dir, { label, timeout = 120000 } = {}) {
+  const started = Date.now();
+  const tag = label || `git ${cmd.split(' ')[0]}`;
+
+  bus.emit('task:progress', {
+    tool: 'git', running: true, phase: 'exec',
+    target: tag, elapsed: 0, log: `running: git ${cmd}`,
+  });
+
+  try {
+    const result = await git(cmd, dir, { timeout });
+    const elapsed = Math.round((Date.now() - started) / 1000);
+    bus.emit('task:progress', {
+      tool: 'git', running: false, phase: 'done',
+      target: tag, elapsed, log: result.code === 0 ? 'completed' : `exit ${result.code}`,
+    });
+    return result;
+  } catch (err) {
+    bus.emit('task:progress', {
+      tool: 'git', running: false, phase: 'error',
+      target: tag, elapsed: Math.round((Date.now() - started) / 1000),
+      log: err.message,
+    });
+    throw err;
+  }
+}
 
 const ACTIONS = {
   init: {
@@ -31,7 +66,12 @@ const ACTIONS = {
     required: ['url'],
     handler: async ({ url, path, branch }) => {
       const cmd = `clone${branch ? ` -b ${branch}` : ''} "${url}"${path ? ` "${path}"` : ''}`;
-      await git(cmd);
+      log('git', `[CLONE] ${url}`);
+      const result = await gitWithProgress(cmd, undefined, {
+        label: `clone ${url.split('/').pop()?.replace('.git', '') || url}`,
+        timeout: 120000,
+      });
+      if (result.code !== 0) throw new Error(result.stderr || 'clone failed');
       return { cloned: true, url, path: path || url.split('/').pop()?.replace('.git', '') };
     },
   },
@@ -85,7 +125,7 @@ const ACTIONS = {
       const msg = params.message.replace(/"/g, '\\"');
       const r = await git(`commit -m "${msg}"`, dir);
       if (r.code !== 0 && r.stderr.includes('nothing to commit')) return { committed: false, reason: 'nothing to commit' };
-      log('git', `[EDIT] Committed: ${params.message}`);
+      log('git', `[COMMIT] ${params.message}`);
       return { committed: true, message: params.message, output: r.stdout.slice(-300) };
     },
   },
@@ -96,7 +136,12 @@ const ACTIONS = {
       const dir = cwd(params);
       const remote = params.remote || '';
       const branch = params.branch || '';
-      const r = await git(`push ${remote} ${branch}`.trim(), dir);
+      log('git', `[PUSH] ${remote} ${branch}`);
+      const r = await gitWithProgress(`push ${remote} ${branch}`.trim(), dir, {
+        label: `push ${remote || 'origin'} ${branch || 'current'}`,
+        timeout: 60000,
+      });
+      if (r.code !== 0) throw new Error(r.stderr || 'push failed');
       return { pushed: true, output: r.stdout.slice(-300) || r.stderr.slice(-300) };
     },
   },
@@ -107,7 +152,12 @@ const ACTIONS = {
       const dir = cwd(params);
       const remote = params.remote || '';
       const branch = params.branch || '';
-      const r = await git(`pull ${remote} ${branch}`.trim(), dir);
+      log('git', `[PULL] ${remote} ${branch}`);
+      const r = await gitWithProgress(`pull ${remote} ${branch}`.trim(), dir, {
+        label: `pull ${remote || 'origin'} ${branch || 'current'}`,
+        timeout: 60000,
+      });
+      if (r.code !== 0) throw new Error(r.stderr || 'pull failed');
       return { pulled: true, output: r.stdout.slice(-300) };
     },
   },

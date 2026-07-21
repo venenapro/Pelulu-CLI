@@ -1,6 +1,9 @@
 /**
  * Project Tool — project lifecycle operations (1 MCP tool, 6 actions)
  * Actions: init, build, test, lint, deps, info
+ *
+ * Long-running operations (build, test, deps) stream progress via task:progress
+ * so the TUI shows live feedback instead of appearing stuck.
  */
 import { exec } from 'child_process';
 import { readFile } from 'fs/promises';
@@ -8,6 +11,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { log } from '../core/logger.js';
 import { getConfig } from '../core/config.js';
+import { bus } from '../core/event-bus.js';
 
 function run(cmd, cwd, timeout = 120000) {
   return new Promise((resolve, reject) => {
@@ -16,6 +20,35 @@ function run(cmd, cwd, timeout = 120000) {
       resolve({ stdout: stdout?.trim() || '', stderr: stderr?.trim() || '', code: err?.code ?? 0 });
     });
   });
+}
+
+/**
+ * Run a command with progress reporting for long operations.
+ */
+async function runWithProgress(cmd, dir, { label, timeout = 120000 } = {}) {
+  const started = Date.now();
+  bus.emit('task:progress', {
+    tool: 'project', running: true, phase: 'exec',
+    target: label || cmd.split(' ')[0], elapsed: 0, log: `running: ${cmd}`,
+  });
+
+  try {
+    const result = await run(cmd, dir, timeout);
+    const elapsed = Math.round((Date.now() - started) / 1000);
+    bus.emit('task:progress', {
+      tool: 'project', running: false, phase: 'done',
+      target: label || cmd.split(' ')[0], elapsed,
+      log: result.code === 0 ? 'completed' : `exit ${result.code}`,
+    });
+    return result;
+  } catch (err) {
+    bus.emit('task:progress', {
+      tool: 'project', running: false, phase: 'error',
+      target: label || cmd.split(' ')[0],
+      elapsed: Math.round((Date.now() - started) / 1000), log: err.message,
+    });
+    throw err;
+  }
 }
 
 function cwd(p) { return p || getConfig().agent?.workspace || process.cwd(); }
@@ -58,7 +91,7 @@ const ACTIONS = {
       const cmd = BUILD_CMD[type];
       if (!cmd) throw new Error(`No build for ${type}`);
       log('project', `[BUILD] Building (${type})...`);
-      const r = await run(cmd, dir);
+      const r = await runWithProgress(cmd, dir, { label: `build (${type})`, timeout: 180000 });
       return { success: r.code === 0, type, exitCode: r.code, output: r.stdout.slice(-500) || r.stderr.slice(-500) };
     },
   },
@@ -71,7 +104,7 @@ const ACTIONS = {
       const cmd = TEST_CMD[type];
       if (!cmd) throw new Error(`No test for ${type}`);
       log('project', `[TEST] Testing (${type})...`);
-      const r = await run(cmd, dir);
+      const r = await runWithProgress(cmd, dir, { label: `test (${type})`, timeout: 180000 });
       return { passed: r.code === 0, type, exitCode: r.code, output: r.stdout.slice(-1000) || r.stderr.slice(-1000) };
     },
   },
@@ -83,7 +116,7 @@ const ACTIONS = {
       const type = await detectProject(dir);
       const cmd = LINT_CMD[type];
       if (!cmd) throw new Error(`No lint for ${type}`);
-      const r = await run(cmd, dir);
+      const r = await runWithProgress(cmd, dir, { label: `lint (${type})` });
       return { type, issues: r.stdout.slice(-2000) };
     },
   },
@@ -96,7 +129,8 @@ const ACTIONS = {
       if (params.install) {
         const cmd = INSTALL_CMD[type];
         if (!cmd) throw new Error(`No install for ${type}`);
-        await run(cmd, dir, 180000);
+        log('project', `[DEPS] Installing (${type})...`);
+        await runWithProgress(cmd, dir, { label: `deps install (${type})`, timeout: 180000 });
         return { installed: true, type };
       }
       try {

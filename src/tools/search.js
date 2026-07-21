@@ -5,6 +5,7 @@
 import { exec } from 'child_process';
 import { log } from '../core/logger.js';
 import { request as httpClientRequest } from '../core/http-client.js';
+import { bus } from '../core/event-bus.js';
 
 function runCmd(cmd, timeout = 10000) {
   return new Promise((resolve) => {
@@ -31,7 +32,9 @@ const ACTIONS = {
       const inc = include ? `--include="*.${include}"` : '';
       const ctx = context ? `-C ${context}` : '';
       const cmd = `grep ${flags}${ic} ${inc} ${ctx} "${pattern}" "${path || '.'}" 2>/dev/null | head -100`;
+      bus.emit('task:progress', { tool: 'search', running: true, phase: 'grep', target: path || '.', log: `searching: ${pattern}` });
       const r = await runCmd(cmd);
+      bus.emit('task:progress', { tool: 'search', running: false, phase: 'done', target: path || '.' });
       const lines = r.stdout.split('\n').filter(Boolean);
       return { pattern, matches: lines.length, results: lines };
     },
@@ -43,7 +46,9 @@ const ACTIONS = {
       log('search', `[FIND] find: ${name}`);
       const t = type ? `-type ${type}` : '';
       const cmd = `find "${path || '.'}" ${t} -name "${name}" 2>/dev/null | head -50`;
+      bus.emit('task:progress', { tool: 'search', running: true, phase: 'find', target: path || '.', log: `finding: ${name}` });
       const r = await runCmd(cmd);
+      bus.emit('task:progress', { tool: 'search', running: false, phase: 'done', target: path || '.' });
       return { pattern: name, matches: r.stdout.split('\n').filter(Boolean).length, files: r.stdout.split('\n').filter(Boolean) };
     },
   },
