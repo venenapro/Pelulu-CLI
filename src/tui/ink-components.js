@@ -27,18 +27,39 @@ readPkgVersion();
 // Memoized — only re-renders when version prop changes
 export const AsciiBanner = React.memo(function AsciiBanner({ version }) {
   const v = version || '0.0.0';
+
+  const cat = [
+    '   /\\_/\\  ',
+    '  ( o.o ) ',
+    '   > ^ <  ',
+    '  /|   |\\ ',
+    ' (_|   |_)',
+  ];
+  const info = [
+    'P E L U L U - C L I',
+    `v${v}`,
+    'coding companion',
+    'powered by XiaoZhi',
+    '',
+  ];
+
   return React.createElement(Box, {
-    flexDirection: 'column', paddingLeft: 1,
+    flexDirection: 'column', width: '100%',
+    borderStyle: 'single', borderColor: 'cyan',
+    paddingY: 0, paddingX: 0,
   },
-    React.createElement(Box, null,
-      React.createElement(Text, { color: 'cyan' }, '  /\\_/\\      '),
-      React.createElement(Text, { color: 'cyan', bold: true }, 'PELULU-CLI'),
+    ...cat.map((line, i) =>
+      React.createElement(Box, { key: i, paddingLeft: 1 },
+        React.createElement(Text, { color: 'cyan' }, line),
+        React.createElement(Text, {
+          color: i === 0 ? 'cyan' : i === 1 ? 'gray' : i === 2 ? 'cyanBright' : 'gray',
+          bold: i === 0,
+        }, '    ' + (info[i] || '')),
+      )
     ),
-    React.createElement(Text, { color: 'cyan' }, ' ( o.o )    v' + v),
-    React.createElement(Text, { color: 'cyan' }, '  > ^ <     the tiny coding agent'),
-    React.createElement(Text, { color: 'cyan' }, ' /|   |\\    powered by XiaoZhi'),
-    React.createElement(Text, { color: 'cyan' }, '(_|   |_)'),
-    React.createElement(Text, { dimColor: true }, '             18 tools • MCP protocol • agent mode'),
+    React.createElement(Box, { paddingLeft: 1 },
+      React.createElement(Text, { dimColor: true }, '  18 tools  •  MCP protocol  •  agent mode  •  xiaozhi.me'),
+    ),
   );
 });
 
